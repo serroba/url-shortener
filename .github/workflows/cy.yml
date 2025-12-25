@@ -1,0 +1,59 @@
+name: CI/CD Pipeline
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+
+      - name: Tidy Go modules
+        shell: bash
+        run: go mod tidy
+
+      - name: Check for uncommitted go.mod/go.sum changes
+        shell: bash
+        run: |
+          if ! git diff --quiet go.mod go.sum; then
+            echo "::error file=go.mod::Dependencies are not tidy. Run 'go mod tidy' and commit changes."
+            git diff
+            exit 1
+          fi
+
+      - name: Install mockgen
+        run: go install go.uber.org/mock/mockgen@latest
+
+      - name: Run go generate
+        run: go generate ./...
+
+      - name: Check for uncommitted changes
+        run: |
+          if ! git diff --quiet; then
+            echo "::error file=go generate::Generated code is not up-to-date. Run 'go generate ./...' and commit the result."
+            git diff
+            exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          args: --timeout=5m
+
+      - name: Run Unit Tests
+        run: go test -v ./...
