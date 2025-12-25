@@ -1,4 +1,4 @@
-package domain
+package shortener
 
 // Code represents a short URL code.
 type Code string

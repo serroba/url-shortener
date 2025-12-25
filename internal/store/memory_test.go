@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/serroba/web-demo-go/internal/domain"
+	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +14,7 @@ func TestMemoryStore_Save(t *testing.T) {
 	t.Run("saves short url successfully", func(t *testing.T) {
 		s := store.NewMemoryStore()
 
-		err := s.Save(context.Background(), &domain.ShortURL{
+		err := s.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: "https://example.com",
 		})
@@ -31,7 +31,7 @@ func TestMemoryStore_Save(t *testing.T) {
 	t.Run("indexes by hash when present", func(t *testing.T) {
 		s := store.NewMemoryStore()
 
-		err := s.Save(context.Background(), &domain.ShortURL{
+		err := s.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: "https://example.com",
 			URLHash:     "somehash",
@@ -43,17 +43,17 @@ func TestMemoryStore_Save(t *testing.T) {
 		shortURL, err := s.GetByHash(context.Background(), "somehash")
 
 		require.NoError(t, err)
-		assert.Equal(t, domain.Code("abc123"), shortURL.Code)
+		assert.Equal(t, shortener.Code("abc123"), shortURL.Code)
 	})
 
 	t.Run("overwrites existing url", func(t *testing.T) {
 		s := store.NewMemoryStore()
-		_ = s.Save(context.Background(), &domain.ShortURL{
+		_ = s.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: "https://example.com",
 		})
 
-		err := s.Save(context.Background(), &domain.ShortURL{
+		err := s.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: "https://other.com",
 		})
@@ -69,7 +69,7 @@ func TestMemoryStore_Save(t *testing.T) {
 func TestMemoryStore_GetByCode(t *testing.T) {
 	t.Run("returns short url when found", func(t *testing.T) {
 		s := store.NewMemoryStore()
-		_ = s.Save(context.Background(), &domain.ShortURL{
+		_ = s.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: "https://example.com",
 		})
@@ -86,14 +86,14 @@ func TestMemoryStore_GetByCode(t *testing.T) {
 		shortURL, err := s.GetByCode(context.Background(), "notfound")
 
 		assert.Nil(t, shortURL)
-		assert.ErrorIs(t, err, domain.ErrNotFound)
+		assert.ErrorIs(t, err, shortener.ErrNotFound)
 	})
 }
 
 func TestMemoryStore_GetByHash(t *testing.T) {
 	t.Run("returns short url when hash exists", func(t *testing.T) {
 		s := store.NewMemoryStore()
-		_ = s.Save(context.Background(), &domain.ShortURL{
+		_ = s.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: "https://example.com",
 			URLHash:     "somehash",
@@ -102,7 +102,7 @@ func TestMemoryStore_GetByHash(t *testing.T) {
 		shortURL, err := s.GetByHash(context.Background(), "somehash")
 
 		require.NoError(t, err)
-		assert.Equal(t, domain.Code("abc123"), shortURL.Code)
+		assert.Equal(t, shortener.Code("abc123"), shortURL.Code)
 		assert.Equal(t, "https://example.com", shortURL.OriginalURL)
 	})
 
@@ -112,6 +112,6 @@ func TestMemoryStore_GetByHash(t *testing.T) {
 		shortURL, err := s.GetByHash(context.Background(), "nonexistent")
 
 		assert.Nil(t, shortURL)
-		assert.ErrorIs(t, err, domain.ErrNotFound)
+		assert.ErrorIs(t, err, shortener.ErrNotFound)
 	})
 }

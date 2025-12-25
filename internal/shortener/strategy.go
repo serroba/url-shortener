@@ -1,15 +1,13 @@
-package handlers
+package shortener
 
 import (
 	"context"
 	"errors"
-
-	"github.com/serroba/web-demo-go/internal/domain"
 )
 
-// ShortenerStrategy defines the interface for URL shortening strategies.
-type ShortenerStrategy interface {
-	Shorten(ctx context.Context, url string) (*domain.ShortURL, error)
+// Strategy defines the interface for URL shortening strategies.
+type Strategy interface {
+	Shorten(ctx context.Context, url string) (*ShortURL, error)
 }
 
 // CodeGenerator generates unique short codes.
@@ -17,21 +15,21 @@ type CodeGenerator func() string
 
 // TokenStrategy always generates a new code for each URL.
 type TokenStrategy struct {
-	store        domain.ShortURLRepository
+	store        Repository
 	generateCode CodeGenerator
 }
 
 // NewTokenStrategy creates a new token-based shortening strategy.
-func NewTokenStrategy(store domain.ShortURLRepository, generator CodeGenerator) *TokenStrategy {
+func NewTokenStrategy(store Repository, generator CodeGenerator) *TokenStrategy {
 	return &TokenStrategy{
 		store:        store,
 		generateCode: generator,
 	}
 }
 
-func (s *TokenStrategy) Shorten(ctx context.Context, url string) (*domain.ShortURL, error) {
-	shortURL := &domain.ShortURL{
-		Code:        domain.Code(s.generateCode()),
+func (s *TokenStrategy) Shorten(ctx context.Context, url string) (*ShortURL, error) {
+	shortURL := &ShortURL{
+		Code:        Code(s.generateCode()),
 		OriginalURL: url,
 		URLHash:     "",
 	}
@@ -45,37 +43,37 @@ func (s *TokenStrategy) Shorten(ctx context.Context, url string) (*domain.ShortU
 
 // HashStrategy deduplicates URLs by returning the same code for identical URLs.
 type HashStrategy struct {
-	store        domain.ShortURLRepository
+	store        Repository
 	generateCode CodeGenerator
 }
 
 // NewHashStrategy creates a new hash-based shortening strategy.
-func NewHashStrategy(store domain.ShortURLRepository, generator CodeGenerator) *HashStrategy {
+func NewHashStrategy(store Repository, generator CodeGenerator) *HashStrategy {
 	return &HashStrategy{
 		store:        store,
 		generateCode: generator,
 	}
 }
 
-func (s *HashStrategy) Shorten(ctx context.Context, rawURL string) (*domain.ShortURL, error) {
+func (s *HashStrategy) Shorten(ctx context.Context, rawURL string) (*ShortURL, error) {
 	normalizedURL, err := NormalizeURL(rawURL)
 	if err != nil {
 		return nil, err
 	}
 
-	urlHash := domain.URLHash(HashURL(normalizedURL))
+	urlHash := URLHash(HashURL(normalizedURL))
 
 	existing, err := s.store.GetByHash(ctx, urlHash)
 	if err == nil {
 		return existing, nil
 	}
 
-	if !errors.Is(err, domain.ErrNotFound) {
+	if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
 
-	shortURL := &domain.ShortURL{
-		Code:        domain.Code(s.generateCode()),
+	shortURL := &ShortURL{
+		Code:        Code(s.generateCode()),
 		OriginalURL: rawURL,
 		URLHash:     urlHash,
 	}

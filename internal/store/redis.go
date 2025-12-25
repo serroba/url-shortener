@@ -5,10 +5,10 @@ import (
 	"errors"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/serroba/web-demo-go/internal/domain"
+	"github.com/serroba/web-demo-go/internal/shortener"
 )
 
-// RedisStore is a Redis implementation of ShortURLRepository.
+// RedisStore is a Redis implementation of shortener.Repository.
 type RedisStore struct {
 	client  *redis.Client
 	prefix  string // "url:" prefix for code->entity (stored as Redis hash)
@@ -24,7 +24,7 @@ func NewRedisStore(client *redis.Client) *RedisStore {
 	}
 }
 
-func (r *RedisStore) Save(ctx context.Context, shortURL *domain.ShortURL) error {
+func (r *RedisStore) Save(ctx context.Context, shortURL *shortener.ShortURL) error {
 	pipe := r.client.Pipeline()
 
 	// Store entity as Redis hash
@@ -44,32 +44,32 @@ func (r *RedisStore) Save(ctx context.Context, shortURL *domain.ShortURL) error 
 	return err
 }
 
-func (r *RedisStore) GetByCode(ctx context.Context, code domain.Code) (*domain.ShortURL, error) {
+func (r *RedisStore) GetByCode(ctx context.Context, code shortener.Code) (*shortener.ShortURL, error) {
 	result, err := r.client.HGetAll(ctx, r.prefix+string(code)).Result()
 	if err != nil {
 		return nil, err
 	}
 
 	if len(result) == 0 {
-		return nil, domain.ErrNotFound
+		return nil, shortener.ErrNotFound
 	}
 
-	return &domain.ShortURL{
-		Code:        domain.Code(result["code"]),
+	return &shortener.ShortURL{
+		Code:        shortener.Code(result["code"]),
 		OriginalURL: result["original_url"],
-		URLHash:     domain.URLHash(result["url_hash"]),
+		URLHash:     shortener.URLHash(result["url_hash"]),
 	}, nil
 }
 
-func (r *RedisStore) GetByHash(ctx context.Context, hash domain.URLHash) (*domain.ShortURL, error) {
+func (r *RedisStore) GetByHash(ctx context.Context, hash shortener.URLHash) (*shortener.ShortURL, error) {
 	code, err := r.client.HGet(ctx, r.hashKey, string(hash)).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return nil, domain.ErrNotFound
+			return nil, shortener.ErrNotFound
 		}
 
 		return nil, err
 	}
 
-	return r.GetByCode(ctx, domain.Code(code))
+	return r.GetByCode(ctx, shortener.Code(code))
 }

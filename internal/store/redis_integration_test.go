@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/serroba/web-demo-go/internal/domain"
+	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +35,7 @@ func TestRedisStoreIntegration(t *testing.T) {
 	s := store.NewRedisStore(client)
 
 	t.Run("save and get by code", func(t *testing.T) {
-		shortURL := &domain.ShortURL{
+		shortURL := &shortener.ShortURL{
 			Code:        "testcode123",
 			OriginalURL: "https://example.com",
 		}
@@ -53,7 +53,7 @@ func TestRedisStoreIntegration(t *testing.T) {
 	})
 
 	t.Run("save and get by hash", func(t *testing.T) {
-		shortURL := &domain.ShortURL{
+		shortURL := &shortener.ShortURL{
 			Code:        "hashcode123",
 			OriginalURL: "https://example.com/hashed",
 			URLHash:     "abc123hash",
@@ -74,10 +74,10 @@ func TestRedisStoreIntegration(t *testing.T) {
 	})
 
 	t.Run("overwrite existing url", func(t *testing.T) {
-		code := domain.Code("overwrite123")
-		_ = s.Save(ctx, &domain.ShortURL{Code: code, OriginalURL: "https://old.com"})
+		code := shortener.Code("overwrite123")
+		_ = s.Save(ctx, &shortener.ShortURL{Code: code, OriginalURL: "https://old.com"})
 
-		err := s.Save(ctx, &domain.ShortURL{Code: code, OriginalURL: "https://new.com"})
+		err := s.Save(ctx, &shortener.ShortURL{Code: code, OriginalURL: "https://new.com"})
 		require.NoError(t, err)
 
 		got, _ := s.GetByCode(ctx, code)
@@ -91,13 +91,13 @@ func TestRedisStoreIntegration(t *testing.T) {
 		got, err := s.GetByCode(ctx, "nonexistent")
 
 		assert.Nil(t, got)
-		assert.ErrorIs(t, err, domain.ErrNotFound)
+		assert.ErrorIs(t, err, shortener.ErrNotFound)
 	})
 
 	t.Run("get by hash non-existent returns ErrNotFound", func(t *testing.T) {
 		got, err := s.GetByHash(ctx, "nonexistenthash")
 
 		assert.Nil(t, got)
-		assert.ErrorIs(t, err, domain.ErrNotFound)
+		assert.ErrorIs(t, err, shortener.ErrNotFound)
 	})
 }

@@ -7,22 +7,22 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/serroba/web-demo-go/internal/domain"
+	"github.com/serroba/web-demo-go/internal/shortener"
 )
 
 // URLHandler handles URL shortening operations.
 type URLHandler struct {
-	strategies      map[Strategy]ShortenerStrategy
-	store           domain.ShortURLRepository
+	strategies      map[Strategy]shortener.Strategy
+	store           shortener.Repository
 	baseURL         string
 	defaultStrategy Strategy
 }
 
 // NewURLHandler creates a new URL handler with injected strategies.
 func NewURLHandler(
-	store domain.ShortURLRepository,
+	store shortener.Repository,
 	baseURL string,
-	strategies map[Strategy]ShortenerStrategy,
+	strategies map[Strategy]shortener.Strategy,
 ) *URLHandler {
 	return &URLHandler{
 		strategies:      strategies,
@@ -64,9 +64,9 @@ func (h *URLHandler) CreateShortURL(ctx context.Context, req *CreateShortURLRequ
 }
 
 func (h *URLHandler) RedirectToURL(ctx context.Context, req *RedirectRequest) (*RedirectResponse, error) {
-	shortURL, err := h.store.GetByCode(ctx, domain.Code(req.Code))
+	shortURL, err := h.store.GetByCode(ctx, shortener.Code(req.Code))
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
+		if errors.Is(err, shortener.ErrNotFound) {
 			return nil, huma.Error404NotFound("short url not found")
 		}
 

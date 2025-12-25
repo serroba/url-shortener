@@ -1,9 +1,9 @@
-package handlers_test
+package shortener_test
 
 import (
 	"testing"
 
-	"github.com/serroba/web-demo-go/internal/handlers"
+	"github.com/serroba/web-demo-go/internal/shortener"
 )
 
 func TestNormalizeURL(t *testing.T) {
@@ -66,7 +66,7 @@ func TestNormalizeURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := handlers.NormalizeURL(tt.input)
+			result, err := shortener.NormalizeURL(tt.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -79,7 +79,7 @@ func TestNormalizeURL(t *testing.T) {
 }
 
 func TestNormalizeURL_InvalidURL(t *testing.T) {
-	_, err := handlers.NormalizeURL("://invalid")
+	_, err := shortener.NormalizeURL("://invalid")
 	if err == nil {
 		t.Error("expected error for invalid URL, got nil")
 	}
@@ -87,32 +87,32 @@ func TestNormalizeURL_InvalidURL(t *testing.T) {
 
 func TestHashURL(t *testing.T) {
 	t.Run("same input produces same hash", func(t *testing.T) {
-		hash1 := handlers.HashURL("https://example.com/path")
+		hash1 := shortener.HashURL("https://example.com/path")
 
-		hash2 := handlers.HashURL("https://example.com/path")
+		hash2 := shortener.HashURL("https://example.com/path")
 		if hash1 != hash2 {
 			t.Errorf("same input produced different hashes: %q vs %q", hash1, hash2)
 		}
 	})
 
 	t.Run("different input produces different hash", func(t *testing.T) {
-		hash1 := handlers.HashURL("https://example.com/path1")
+		hash1 := shortener.HashURL("https://example.com/path1")
 
-		hash2 := handlers.HashURL("https://example.com/path2")
+		hash2 := shortener.HashURL("https://example.com/path2")
 		if hash1 == hash2 {
 			t.Error("different inputs produced same hash")
 		}
 	})
 
 	t.Run("hash is 64 hex characters (SHA256)", func(t *testing.T) {
-		hash := handlers.HashURL("https://example.com/path")
+		hash := shortener.HashURL("https://example.com/path")
 		if len(hash) != 64 {
 			t.Errorf("hash length is %d, expected 64", len(hash))
 		}
 	})
 
 	t.Run("hash contains only hex characters", func(t *testing.T) {
-		hash := handlers.HashURL("https://example.com/path")
+		hash := shortener.HashURL("https://example.com/path")
 
 		for _, c := range hash {
 			isDigit := c >= '0' && c <= '9'
@@ -137,12 +137,12 @@ func TestNormalizeAndHash_Equivalence(t *testing.T) {
 	var firstHash string
 
 	for i, url := range equivalentURLs {
-		normalized, err := handlers.NormalizeURL(url)
+		normalized, err := shortener.NormalizeURL(url)
 		if err != nil {
 			t.Fatalf("failed to normalize %q: %v", url, err)
 		}
 
-		hash := handlers.HashURL(normalized)
+		hash := shortener.HashURL(normalized)
 
 		if i == 0 {
 			firstHash = hash

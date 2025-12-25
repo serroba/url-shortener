@@ -6,19 +6,19 @@ import (
 	"testing"
 
 	"github.com/jaevor/go-nanoid"
-	"github.com/serroba/web-demo-go/internal/domain"
 	"github.com/serroba/web-demo-go/internal/handlers"
+	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestHandler(s domain.ShortURLRepository) *handlers.URLHandler {
+func newTestHandler(s shortener.Repository) *handlers.URLHandler {
 	gen, _ := nanoid.Standard(8)
 
-	strategies := map[handlers.Strategy]handlers.ShortenerStrategy{
-		handlers.StrategyToken: handlers.NewTokenStrategy(s, gen),
-		handlers.StrategyHash:  handlers.NewHashStrategy(s, gen),
+	strategies := map[handlers.Strategy]shortener.Strategy{
+		handlers.StrategyToken: shortener.NewTokenStrategy(s, gen),
+		handlers.StrategyHash:  shortener.NewHashStrategy(s, gen),
 	}
 
 	return handlers.NewURLHandler(s, "http://localhost:8888", strategies)
@@ -161,7 +161,7 @@ func TestCreateShortURL(t *testing.T) {
 func TestRedirectToURL(t *testing.T) {
 	t.Run("redirects to original url", func(t *testing.T) {
 		memStore := store.NewMemoryStore()
-		_ = memStore.Save(context.Background(), &domain.ShortURL{
+		_ = memStore.Save(context.Background(), &shortener.ShortURL{
 			Code:        "abc123",
 			OriginalURL: testURL,
 		})
@@ -205,7 +205,7 @@ func TestCreateShortURL_ErrorPaths(t *testing.T) {
 	t.Run("token strategy returns error when save fails", func(t *testing.T) {
 		mockStore := &mockStore{
 			saveErr:      errMock,
-			getByHashErr: domain.ErrNotFound,
+			getByHashErr: shortener.ErrNotFound,
 		}
 		handler := newTestHandler(mockStore)
 
@@ -235,7 +235,7 @@ func TestCreateShortURL_ErrorPaths(t *testing.T) {
 
 	t.Run("hash strategy returns error when Save fails", func(t *testing.T) {
 		mockStore := &mockStore{
-			getByHashErr: domain.ErrNotFound,
+			getByHashErr: shortener.ErrNotFound,
 			saveErr:      errMock,
 		}
 		handler := newTestHandler(mockStore)

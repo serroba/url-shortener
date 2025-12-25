@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
 	"github.com/serroba/web-demo-go/internal/handlers"
+	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
 )
 
@@ -35,9 +36,9 @@ func New(_ humacli.Hooks, options *Options) *do.Injector {
 
 	codeGenerator, _ := nanoid.Standard(options.CodeLength)
 
-	strategies := map[handlers.Strategy]handlers.ShortenerStrategy{
-		handlers.StrategyToken: handlers.NewTokenStrategy(urlStore, codeGenerator),
-		handlers.StrategyHash:  handlers.NewHashStrategy(urlStore, codeGenerator),
+	strategies := map[handlers.Strategy]shortener.Strategy{
+		handlers.StrategyToken: shortener.NewTokenStrategy(urlStore, codeGenerator),
+		handlers.StrategyHash:  shortener.NewHashStrategy(urlStore, codeGenerator),
 	}
 
 	urlHandler := handlers.NewURLHandler(urlStore, baseURL, strategies)
