@@ -23,3 +23,11 @@ type CreateShortURLResponse struct {
 type RedirectRequest struct {
 	Code string `doc:"The short code" example:"abc123" path:"code"`
 }
+
+// RedirectResponse is the 301 redirect response.
+type RedirectResponse struct {
+	Status  int
+	Headers struct {
+		Location string `doc:"The original URL to redirect to" header:"Location"`
+	}
+}
