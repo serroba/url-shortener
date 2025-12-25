@@ -2,6 +2,7 @@ package ratelimit_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -85,4 +86,24 @@ func TestSlidingWindowLimiter(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, allowed, "should be allowed after window expires")
 	})
+
+	t.Run("returns error when store fails", func(t *testing.T) {
+		storeErr := errors.New("store error")
+		mockStore := &mockRateLimitStore{err: storeErr}
+		limiter := ratelimit.NewSlidingWindowLimiter(mockStore, 5, time.Minute)
+
+		allowed, err := limiter.Allow(context.Background(), "client1")
+
+		assert.False(t, allowed)
+		assert.ErrorIs(t, err, storeErr)
+	})
+}
+
+type mockRateLimitStore struct {
+	count int64
+	err   error
+}
+
+func (m *mockRateLimitStore) Record(_ context.Context, _ string, _ time.Duration) (int64, error) {
+	return m.count, m.err
 }

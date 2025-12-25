@@ -207,3 +207,83 @@ func (c *capturingLimiter) Allow(_ context.Context, key string) (bool, error) {
 
 	return c.allowed, nil
 }
+
+func TestRateLimiter_LimiterError(t *testing.T) {
+	api := newTestAPI()
+	limiter := &mockLimiter{allowed: false, err: errors.New("limiter error")}
+	mw := middleware.RateLimiter(api, limiter)
+
+	ctx := newMockHumaContext()
+	ctx.host = testHostAddr
+	ctx.headers["User-Agent"] = testUserAgent
+
+	nextCalled := false
+
+	mw(ctx, func(_ huma.Context) {
+		nextCalled = true
+	})
+
+	assert.False(t, nextCalled, "next should not be called when limiter errors")
+	assert.Equal(t, 500, ctx.statusCode)
+}
+
+func TestClientIP_XRealIP(t *testing.T) {
+	api := newTestAPI()
+
+	var capturedKey string
+
+	limiter := &capturingLimiter{
+		allowed:     true,
+		capturedKey: &capturedKey,
+	}
+	mw := middleware.RateLimiter(api, limiter)
+
+	ctx := newMockHumaContext()
+	ctx.host = "10.0.0.1:12345"
+	ctx.headers["X-Real-IP"] = "203.0.113.100"
+	ctx.headers["User-Agent"] = "TestAgent"
+
+	mw(ctx, func(_ huma.Context) {})
+
+	keyWithXRI := capturedKey
+
+	// Request with same X-Real-IP should have same key
+	ctx2 := newMockHumaContext()
+	ctx2.host = "10.0.0.2:54321"
+	ctx2.headers["X-Real-IP"] = "203.0.113.100"
+	ctx2.headers["User-Agent"] = "TestAgent"
+
+	mw(ctx2, func(_ huma.Context) {})
+
+	assert.Equal(t, keyWithXRI, capturedKey, "should use X-Real-IP when present")
+}
+
+func TestClientIP_HostWithoutPort(t *testing.T) {
+	api := newTestAPI()
+
+	var capturedKey string
+
+	limiter := &capturingLimiter{
+		allowed:     true,
+		capturedKey: &capturedKey,
+	}
+	mw := middleware.RateLimiter(api, limiter)
+
+	// Host without port (SplitHostPort will fail)
+	ctx := newMockHumaContext()
+	ctx.host = "192.168.1.1"
+	ctx.headers["User-Agent"] = "TestAgent"
+
+	mw(ctx, func(_ huma.Context) {})
+
+	key1 := capturedKey
+
+	// Same host should produce same key
+	ctx2 := newMockHumaContext()
+	ctx2.host = "192.168.1.1"
+	ctx2.headers["User-Agent"] = "TestAgent"
+
+	mw(ctx2, func(_ huma.Context) {})
+
+	assert.Equal(t, key1, capturedKey, "should use host as-is when SplitHostPort fails")
+}

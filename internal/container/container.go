@@ -25,6 +25,7 @@ type Options struct {
 	RedisAddr       string        `default:"localhost:6379" help:"Redis server address" short:"r"`
 	RateLimitReqs   int64         `default:"100"            env:"RATE_LIMIT_REQUESTS"   help:"Requests per window"`
 	RateLimitWindow time.Duration `default:"1m"             env:"RATE_LIMIT_WINDOW"     help:"Rate limit window"`
+	RateLimitStore  string        `default:"memory"         env:"RATE_LIMIT_STORE"      help:"memory or redis"`
 }
 
 func New(_ humacli.Hooks, options *Options) *do.Injector {
@@ -33,14 +34,15 @@ func New(_ humacli.Hooks, options *Options) *do.Injector {
 	router := chi.NewMux()
 	api := humachi.New(router, huma.DefaultConfig("URL Shortener", "1.0.0"))
 
-	// Set up rate limiting
-	rateLimitStore := store.NewRateLimitMemoryStore()
-	limiter := ratelimit.NewSlidingWindowLimiter(rateLimitStore, options.RateLimitReqs, options.RateLimitWindow)
-	api.UseMiddleware(middleware.RateLimiter(api, limiter))
-
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: options.RedisAddr,
 	})
+
+	// Set up rate limiting with configurable backend
+	rateLimitStore := newRateLimitStore(options.RateLimitStore, redisClient)
+	limiter := ratelimit.NewSlidingWindowLimiter(rateLimitStore, options.RateLimitReqs, options.RateLimitWindow)
+	api.UseMiddleware(middleware.RateLimiter(api, limiter))
+
 	urlStore := store.NewRedisStore(redisClient)
 	baseURL := fmt.Sprintf("http://localhost:%d", options.Port)
 
@@ -61,4 +63,13 @@ func New(_ humacli.Hooks, options *Options) *do.Injector {
 	handlers.RegisterRoutes(api, urlHandler)
 
 	return injector
+}
+
+func newRateLimitStore(storeType string, redisClient *redis.Client) ratelimit.Store {
+	switch storeType {
+	case "redis":
+		return store.NewRateLimitRedisStore(redisClient)
+	default:
+		return store.NewRateLimitMemoryStore()
+	}
 }
