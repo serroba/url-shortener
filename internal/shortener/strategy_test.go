@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testNewCode = "newcode"
+
 type mockRepository struct {
 	saveFunc      func(ctx context.Context, shortURL *shortener.ShortURL) error
 	getByCodeFunc func(ctx context.Context, code shortener.Code) (*shortener.ShortURL, error)
@@ -20,6 +22,7 @@ func (m *mockRepository) Save(ctx context.Context, shortURL *shortener.ShortURL)
 	if m.saveFunc != nil {
 		return m.saveFunc(ctx, shortURL)
 	}
+
 	return nil
 }
 
@@ -27,6 +30,7 @@ func (m *mockRepository) GetByCode(ctx context.Context, code shortener.Code) (*s
 	if m.getByCodeFunc != nil {
 		return m.getByCodeFunc(ctx, code)
 	}
+
 	return nil, shortener.ErrNotFound
 }
 
@@ -34,15 +38,18 @@ func (m *mockRepository) GetByHash(ctx context.Context, hash shortener.URLHash) 
 	if m.getByHashFunc != nil {
 		return m.getByHashFunc(ctx, hash)
 	}
+
 	return nil, shortener.ErrNotFound
 }
 
 func TestTokenStrategy_Shorten(t *testing.T) {
 	t.Run("generates new code and saves", func(t *testing.T) {
 		var savedURL *shortener.ShortURL
+
 		repo := &mockRepository{
 			saveFunc: func(_ context.Context, s *shortener.ShortURL) error {
 				savedURL = s
+
 				return nil
 			},
 		}
@@ -87,7 +94,7 @@ func TestHashStrategy_Shorten(t *testing.T) {
 				return existing, nil
 			},
 		}
-		generator := func() string { return "newcode" }
+		generator := func() string { return testNewCode }
 
 		strategy := shortener.NewHashStrategy(repo, generator)
 		result, err := strategy.Shorten(context.Background(), "https://example.com")
@@ -98,16 +105,18 @@ func TestHashStrategy_Shorten(t *testing.T) {
 
 	t.Run("creates new short URL when hash not found", func(t *testing.T) {
 		var savedURL *shortener.ShortURL
+
 		repo := &mockRepository{
 			getByHashFunc: func(_ context.Context, _ shortener.URLHash) (*shortener.ShortURL, error) {
 				return nil, shortener.ErrNotFound
 			},
 			saveFunc: func(_ context.Context, s *shortener.ShortURL) error {
 				savedURL = s
+
 				return nil
 			},
 		}
-		generator := func() string { return "newcode" }
+		generator := func() string { return testNewCode }
 
 		strategy := shortener.NewHashStrategy(repo, generator)
 		result, err := strategy.Shorten(context.Background(), "https://example.com")
@@ -126,7 +135,7 @@ func TestHashStrategy_Shorten(t *testing.T) {
 				return nil, repoErr
 			},
 		}
-		generator := func() string { return "newcode" }
+		generator := func() string { return testNewCode }
 
 		strategy := shortener.NewHashStrategy(repo, generator)
 		result, err := strategy.Shorten(context.Background(), "https://example.com")
@@ -145,7 +154,7 @@ func TestHashStrategy_Shorten(t *testing.T) {
 				return saveErr
 			},
 		}
-		generator := func() string { return "newcode" }
+		generator := func() string { return testNewCode }
 
 		strategy := shortener.NewHashStrategy(repo, generator)
 		result, err := strategy.Shorten(context.Background(), "https://example.com")
@@ -156,7 +165,7 @@ func TestHashStrategy_Shorten(t *testing.T) {
 
 	t.Run("returns error for invalid URL", func(t *testing.T) {
 		repo := &mockRepository{}
-		generator := func() string { return "newcode" }
+		generator := func() string { return testNewCode }
 
 		strategy := shortener.NewHashStrategy(repo, generator)
 		result, err := strategy.Shorten(context.Background(), "://invalid")

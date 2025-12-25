@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	testHostAddr  = "192.168.1.1:12345"
-	testUserAgent = "TestAgent/1.0"
+	testHostAddr       = "192.168.1.1:12345"
+	testUserAgent      = "TestAgent/1.0"
+	testUserAgentShort = "TestAgent"
 )
 
 var errMultipartNotSupported = errors.New("multipart not supported in mock")
@@ -179,7 +180,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx := newMockHumaContext()
 		ctx.host = "10.0.0.1:12345"
 		ctx.headers["X-Forwarded-For"] = "203.0.113.195, 70.41.3.18, 150.172.238.178"
-		ctx.headers["User-Agent"] = "TestAgent"
+		ctx.headers["User-Agent"] = testUserAgentShort
 
 		mw(ctx, func(_ huma.Context) {})
 
@@ -189,7 +190,7 @@ func TestRateLimiter(t *testing.T) {
 		ctx2 := newMockHumaContext()
 		ctx2.host = "10.0.0.2:54321"
 		ctx2.headers["X-Forwarded-For"] = "203.0.113.195"
-		ctx2.headers["User-Agent"] = "TestAgent"
+		ctx2.headers["User-Agent"] = testUserAgentShort
 
 		mw(ctx2, func(_ huma.Context) {})
 
@@ -241,7 +242,7 @@ func TestClientIP_XRealIP(t *testing.T) {
 	ctx := newMockHumaContext()
 	ctx.host = "10.0.0.1:12345"
 	ctx.headers["X-Real-IP"] = "203.0.113.100"
-	ctx.headers["User-Agent"] = "TestAgent"
+	ctx.headers["User-Agent"] = testUserAgentShort
 
 	mw(ctx, func(_ huma.Context) {})
 
@@ -251,7 +252,7 @@ func TestClientIP_XRealIP(t *testing.T) {
 	ctx2 := newMockHumaContext()
 	ctx2.host = "10.0.0.2:54321"
 	ctx2.headers["X-Real-IP"] = "203.0.113.100"
-	ctx2.headers["User-Agent"] = "TestAgent"
+	ctx2.headers["User-Agent"] = testUserAgentShort
 
 	mw(ctx2, func(_ huma.Context) {})
 
@@ -272,7 +273,7 @@ func TestClientIP_HostWithoutPort(t *testing.T) {
 	// Host without port (SplitHostPort will fail)
 	ctx := newMockHumaContext()
 	ctx.host = "192.168.1.1"
-	ctx.headers["User-Agent"] = "TestAgent"
+	ctx.headers["User-Agent"] = testUserAgentShort
 
 	mw(ctx, func(_ huma.Context) {})
 
@@ -281,7 +282,7 @@ func TestClientIP_HostWithoutPort(t *testing.T) {
 	// Same host should produce same key
 	ctx2 := newMockHumaContext()
 	ctx2.host = "192.168.1.1"
-	ctx2.headers["User-Agent"] = "TestAgent"
+	ctx2.headers["User-Agent"] = testUserAgentShort
 
 	mw(ctx2, func(_ huma.Context) {})
 
