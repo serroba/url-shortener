@@ -1,0 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 95%
+
+ignore:
+  - "cmd/**/*"
+  - "internal/container/**/*"
+  - "internal/store/redis.go"
+  - "internal/handlers/routes.go"
