@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:goconst
 func TestCreateShortURL(t *testing.T) {
 	t.Run("creates short url successfully", func(t *testing.T) {
 		memStore := store.NewMemoryStore()

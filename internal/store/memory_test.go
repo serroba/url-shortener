@@ -51,3 +51,46 @@ func TestMemoryStore_Get(t *testing.T) {
 		assert.ErrorIs(t, err, handlers.ErrNotFound)
 	})
 }
+
+func TestMemoryStore_SaveWithHash(t *testing.T) {
+	t.Run("saves both code and hash mappings", func(t *testing.T) {
+		s := store.NewMemoryStore()
+
+		err := s.SaveWithHash(context.Background(), "abc123", "https://example.com", "somehash")
+
+		require.NoError(t, err)
+
+		// Verify code->url mapping
+		url, err := s.Get(context.Background(), "abc123")
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com", url)
+
+		// Verify hash->code mapping
+		code, err := s.GetCodeByHash(context.Background(), "somehash")
+
+		require.NoError(t, err)
+		assert.Equal(t, "abc123", code)
+	})
+}
+
+func TestMemoryStore_GetCodeByHash(t *testing.T) {
+	t.Run("returns code when hash exists", func(t *testing.T) {
+		s := store.NewMemoryStore()
+		_ = s.SaveWithHash(context.Background(), "abc123", "https://example.com", "somehash")
+
+		code, err := s.GetCodeByHash(context.Background(), "somehash")
+
+		require.NoError(t, err)
+		assert.Equal(t, "abc123", code)
+	})
+
+	t.Run("returns ErrNotFound when hash does not exist", func(t *testing.T) {
+		s := store.NewMemoryStore()
+
+		code, err := s.GetCodeByHash(context.Background(), "nonexistent")
+
+		assert.Empty(t, code)
+		assert.ErrorIs(t, err, handlers.ErrNotFound)
+	})
+}
