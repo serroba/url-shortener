@@ -7,11 +7,11 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	_ "github.com/danielgtaylor/huma/v2/formats/cbor" // CBOR format support for huma
-	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
 	"github.com/jaevor/go-nanoid"
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
+	"github.com/serroba/web-demo-go/internal/cache"
 	"github.com/serroba/web-demo-go/internal/handlers"
 	"github.com/serroba/web-demo-go/internal/health"
 	"github.com/serroba/web-demo-go/internal/middleware"
@@ -27,52 +27,86 @@ type Options struct {
 	RateLimitReqs   int64         `default:"100"            env:"RATE_LIMIT_REQUESTS"   help:"Requests per window"`
 	RateLimitWindow time.Duration `default:"1m"             env:"RATE_LIMIT_WINDOW"     help:"Rate limit window"`
 	RateLimitStore  string        `default:"memory"         env:"RATE_LIMIT_STORE"      help:"memory or redis"`
+	CacheSize       int           `default:"1000"           env:"CACHE_SIZE"            help:"LRU cache size (0=off)"`
 }
 
-func New(_ humacli.Hooks, options *Options) *do.Injector {
-	injector := do.New()
+// RedisPackage provides the Redis client.
+func RedisPackage(i *do.Injector) {
+	do.Provide(i, func(i *do.Injector) (*redis.Client, error) {
+		opts := do.MustInvoke[*Options](i)
 
-	router := chi.NewMux()
-	api := humachi.New(router, huma.DefaultConfig("URL Shortener", "1.0.0"))
+		return redis.NewClient(&redis.Options{
+			Addr: opts.RedisAddr,
+		}), nil
+	})
+}
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: options.RedisAddr,
+// RepositoryPackage provides the URL repository with optional caching.
+func RepositoryPackage(i *do.Injector) {
+	do.Provide(i, func(i *do.Injector) (shortener.Repository, error) {
+		opts := do.MustInvoke[*Options](i)
+		redisClient := do.MustInvoke[*redis.Client](i)
+
+		var repo shortener.Repository = store.NewRedisStore(redisClient)
+
+		if opts.CacheSize > 0 {
+			repo = store.NewCachedRepository(repo, cache.New(opts.CacheSize))
+		}
+
+		return repo, nil
+	})
+}
+
+// RateLimitPackage provides the rate limit store.
+func RateLimitPackage(i *do.Injector) {
+	do.Provide(i, func(i *do.Injector) (ratelimit.Store, error) {
+		opts := do.MustInvoke[*Options](i)
+		redisClient := do.MustInvoke[*redis.Client](i)
+
+		switch opts.RateLimitStore {
+		case "redis":
+			return store.NewRateLimitRedisStore(redisClient), nil
+		default:
+			return store.NewRateLimitMemoryStore(), nil
+		}
+	})
+}
+
+// HTTPPackage provides the router, API, and registers routes.
+func HTTPPackage(i *do.Injector) {
+	do.Provide(i, func(_ *do.Injector) (*chi.Mux, error) {
+		return chi.NewMux(), nil
 	})
 
-	// Set up rate limiting with configurable backend
-	rateLimitStore := newRateLimitStore(options.RateLimitStore, redisClient)
-	limiter := ratelimit.NewSlidingWindowLimiter(rateLimitStore, options.RateLimitReqs, options.RateLimitWindow)
-	api.UseMiddleware(middleware.RateLimiter(api, limiter))
+	do.Provide(i, func(i *do.Injector) (huma.API, error) {
+		router := do.MustInvoke[*chi.Mux](i)
+		opts := do.MustInvoke[*Options](i)
+		redisClient := do.MustInvoke[*redis.Client](i)
+		urlStore := do.MustInvoke[shortener.Repository](i)
+		rateLimitStore := do.MustInvoke[ratelimit.Store](i)
 
-	urlStore := store.NewRedisStore(redisClient)
-	baseURL := fmt.Sprintf("http://localhost:%d", options.Port)
+		api := humachi.New(router, huma.DefaultConfig("URL Shortener", "1.0.0"))
 
-	codeGenerator, _ := nanoid.Standard(options.CodeLength)
+		// Set up rate limiting
+		limiter := ratelimit.NewSlidingWindowLimiter(rateLimitStore, opts.RateLimitReqs, opts.RateLimitWindow)
+		api.UseMiddleware(middleware.RateLimiter(api, limiter))
 
-	strategies := map[handlers.Strategy]shortener.Strategy{
-		handlers.StrategyToken: shortener.NewTokenStrategy(urlStore, codeGenerator),
-		handlers.StrategyHash:  shortener.NewHashStrategy(urlStore, codeGenerator),
-	}
+		// Set up handlers
+		baseURL := fmt.Sprintf("http://localhost:%d", opts.Port)
+		codeGenerator, _ := nanoid.Standard(opts.CodeLength)
 
-	urlHandler := handlers.NewURLHandler(urlStore, baseURL, strategies)
-	healthHandler := health.NewHandler(health.NewRedisChecker(redisClient))
+		strategies := map[handlers.Strategy]shortener.Strategy{
+			handlers.StrategyToken: shortener.NewTokenStrategy(urlStore, codeGenerator),
+			handlers.StrategyHash:  shortener.NewHashStrategy(urlStore, codeGenerator),
+		}
 
-	do.ProvideValue(injector, router)
-	do.ProvideValue(injector, api)
-	do.ProvideValue(injector, options)
-	do.ProvideValue(injector, redisClient)
+		urlHandler := handlers.NewURLHandler(urlStore, baseURL, strategies)
+		healthHandler := health.NewHandler(health.NewRedisChecker(redisClient))
 
-	handlers.RegisterRoutes(api, urlHandler)
-	health.RegisterRoutes(api, healthHandler)
+		// Register routes
+		handlers.RegisterRoutes(api, urlHandler)
+		health.RegisterRoutes(api, healthHandler)
 
-	return injector
-}
-
-func newRateLimitStore(storeType string, redisClient *redis.Client) ratelimit.Store {
-	switch storeType {
-	case "redis":
-		return store.NewRateLimitRedisStore(redisClient)
-	default:
-		return store.NewRateLimitMemoryStore()
-	}
+		return api, nil
+	})
 }

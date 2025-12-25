@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/do"
@@ -13,14 +14,21 @@ import (
 
 func main() {
 	cli := humacli.New(func(hooks humacli.Hooks, options *container.Options) {
-		injector := container.New(hooks, options)
+		injector := do.New()
+		do.ProvideValue(injector, options)
+		container.RedisPackage(injector)
+		container.RepositoryPackage(injector)
+		container.RateLimitPackage(injector)
+		container.HTTPPackage(injector)
 
 		hooks.OnStart(func() {
 			router := do.MustInvoke[*chi.Mux](injector)
-			opts := do.MustInvoke[*container.Options](injector)
+
+			// Invoke API to trigger route registration
+			_ = do.MustInvoke[huma.API](injector)
 
 			server := &http.Server{
-				Addr:              fmt.Sprintf(":%d", opts.Port),
+				Addr:              fmt.Sprintf(":%d", options.Port),
 				Handler:           router,
 				ReadHeaderTimeout: 10 * time.Second,
 			}
