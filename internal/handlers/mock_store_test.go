@@ -3,51 +3,44 @@ package handlers_test
 import (
 	"context"
 	"errors"
+
+	"github.com/serroba/web-demo-go/internal/domain"
 )
 
 var errMock = errors.New("mock error")
 
 const testURL = "https://example.com"
 
-// mockStore is a test double for URLRepository that can be configured to return errors.
+// mockStore is a test double for ShortURLRepository that can be configured to return errors.
 type mockStore struct {
-	saveErr             error
-	getErr              error
-	saveWithHashErr     error
-	getCodeByHashErr    error
-	savedCode           string
-	savedURL            string
-	savedHash           string
-	getCodeByHashResult string
+	saveErr         error
+	getByCodeErr    error
+	getByHashErr    error
+	saved           *domain.ShortURL
+	getByHashResult *domain.ShortURL
 }
 
-func (m *mockStore) Save(_ context.Context, code, url string) error {
-	m.savedCode = code
-	m.savedURL = url
+func (m *mockStore) Save(_ context.Context, shortURL *domain.ShortURL) error {
+	m.saved = shortURL
 
 	return m.saveErr
 }
 
-func (m *mockStore) Get(_ context.Context, _ string) (string, error) {
-	if m.getErr != nil {
-		return "", m.getErr
+func (m *mockStore) GetByCode(_ context.Context, _ domain.Code) (*domain.ShortURL, error) {
+	if m.getByCodeErr != nil {
+		return nil, m.getByCodeErr
 	}
 
-	return testURL, nil
+	return &domain.ShortURL{
+		Code:        "abc123",
+		OriginalURL: testURL,
+	}, nil
 }
 
-func (m *mockStore) SaveWithHash(_ context.Context, code, url, hash string) error {
-	m.savedCode = code
-	m.savedURL = url
-	m.savedHash = hash
-
-	return m.saveWithHashErr
-}
-
-func (m *mockStore) GetCodeByHash(_ context.Context, _ string) (string, error) {
-	if m.getCodeByHashErr != nil {
-		return "", m.getCodeByHashErr
+func (m *mockStore) GetByHash(_ context.Context, _ domain.URLHash) (*domain.ShortURL, error) {
+	if m.getByHashErr != nil {
+		return nil, m.getByHashErr
 	}
 
-	return m.getCodeByHashResult, nil
+	return m.getByHashResult, nil
 }

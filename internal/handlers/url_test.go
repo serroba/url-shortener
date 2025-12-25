@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/serroba/web-demo-go/internal/domain"
 	"github.com/serroba/web-demo-go/internal/handlers"
 	"github.com/serroba/web-demo-go/internal/store"
 	"github.com/stretchr/testify/assert"
@@ -148,7 +149,10 @@ func TestCreateShortURL(t *testing.T) {
 func TestRedirectToURL(t *testing.T) {
 	t.Run("redirects to original url", func(t *testing.T) {
 		memStore := store.NewMemoryStore()
-		_ = memStore.Save(context.Background(), "abc123", testURL)
+		_ = memStore.Save(context.Background(), &domain.ShortURL{
+			Code:        "abc123",
+			OriginalURL: testURL,
+		})
 		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
 
 		req := &handlers.RedirectRequest{Code: "abc123"}
@@ -173,7 +177,7 @@ func TestRedirectToURL(t *testing.T) {
 	})
 
 	t.Run("returns 500 on store error", func(t *testing.T) {
-		mockStore := &mockStore{getErr: errMock}
+		mockStore := &mockStore{getByCodeErr: errMock}
 		handler := handlers.NewURLHandler(mockStore, "http://localhost:8888", 8)
 
 		req := &handlers.RedirectRequest{Code: "abc123"}
@@ -188,8 +192,8 @@ func TestRedirectToURL(t *testing.T) {
 func TestCreateShortURL_ErrorPaths(t *testing.T) {
 	t.Run("token strategy returns error when save fails", func(t *testing.T) {
 		mockStore := &mockStore{
-			saveErr:          errMock,
-			getCodeByHashErr: handlers.ErrNotFound,
+			saveErr:      errMock,
+			getByHashErr: domain.ErrNotFound,
 		}
 		handler := handlers.NewURLHandler(mockStore, "http://localhost:8888", 8)
 
@@ -203,8 +207,8 @@ func TestCreateShortURL_ErrorPaths(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("hash strategy returns error on unexpected GetCodeByHash error", func(t *testing.T) {
-		mockStore := &mockStore{getCodeByHashErr: errMock}
+	t.Run("hash strategy returns error on unexpected GetByHash error", func(t *testing.T) {
+		mockStore := &mockStore{getByHashErr: errMock}
 		handler := handlers.NewURLHandler(mockStore, "http://localhost:8888", 8)
 
 		req := &handlers.CreateShortURLRequest{}
@@ -217,10 +221,10 @@ func TestCreateShortURL_ErrorPaths(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("hash strategy returns error when SaveWithHash fails", func(t *testing.T) {
+	t.Run("hash strategy returns error when Save fails", func(t *testing.T) {
 		mockStore := &mockStore{
-			getCodeByHashErr: handlers.ErrNotFound,
-			saveWithHashErr:  errMock,
+			getByHashErr: domain.ErrNotFound,
+			saveErr:      errMock,
 		}
 		handler := handlers.NewURLHandler(mockStore, "http://localhost:8888", 8)
 

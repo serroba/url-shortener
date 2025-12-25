@@ -4,63 +4,63 @@ import (
 	"context"
 	"sync"
 
-	"github.com/serroba/web-demo-go/internal/handlers"
+	"github.com/serroba/web-demo-go/internal/domain"
 )
 
-// MemoryStore is an in-memory implementation of URLRepository.
+// MemoryStore is an in-memory implementation of ShortURLRepository.
 type MemoryStore struct {
 	mu     sync.RWMutex
-	urls   map[string]string // code -> url
-	hashes map[string]string // urlHash -> code
+	urls   map[domain.Code]*domain.ShortURL // code -> entity
+	hashes map[domain.URLHash]domain.Code   // urlHash -> code (index for hash lookups)
 }
 
 // NewMemoryStore creates a new in-memory URL store.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		urls:   make(map[string]string),
-		hashes: make(map[string]string),
+		urls:   make(map[domain.Code]*domain.ShortURL),
+		hashes: make(map[domain.URLHash]domain.Code),
 	}
 }
 
-func (m *MemoryStore) Save(_ context.Context, code, url string) error {
+func (m *MemoryStore) Save(_ context.Context, shortURL *domain.ShortURL) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.urls[code] = url
+	m.urls[shortURL.Code] = shortURL
+
+	// Index by hash if present (for hash strategy)
+	if shortURL.URLHash != "" {
+		m.hashes[shortURL.URLHash] = shortURL.Code
+	}
 
 	return nil
 }
 
-func (m *MemoryStore) Get(_ context.Context, code string) (string, error) {
+func (m *MemoryStore) GetByCode(_ context.Context, code domain.Code) (*domain.ShortURL, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	url, ok := m.urls[code]
+	shortURL, ok := m.urls[code]
 	if !ok {
-		return "", handlers.ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
-	return url, nil
+	return shortURL, nil
 }
 
-func (m *MemoryStore) SaveWithHash(_ context.Context, code, url, urlHash string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.urls[code] = url
-	m.hashes[urlHash] = code
-
-	return nil
-}
-
-func (m *MemoryStore) GetCodeByHash(_ context.Context, urlHash string) (string, error) {
+func (m *MemoryStore) GetByHash(_ context.Context, hash domain.URLHash) (*domain.ShortURL, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	code, ok := m.hashes[urlHash]
+	code, ok := m.hashes[hash]
 	if !ok {
-		return "", handlers.ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 
-	return code, nil
+	shortURL, ok := m.urls[code]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+
+	return shortURL, nil
 }
