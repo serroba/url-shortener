@@ -11,8 +11,6 @@ import (
 	"github.com/serroba/web-demo-go/internal/store"
 )
 
-const codeLength = 8
-
 // URLHandler handles URL shortening operations.
 type URLHandler struct {
 	store      store.URLStore
@@ -21,7 +19,7 @@ type URLHandler struct {
 }
 
 // NewURLHandler creates a new URL handler with the given store.
-func NewURLHandler(s store.URLStore, baseURL string) *URLHandler {
+func NewURLHandler(s store.URLStore, baseURL string, codeLength int) *URLHandler {
 	gen, _ := nanoid.Standard(codeLength)
 
 	return &URLHandler{

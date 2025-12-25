@@ -14,7 +14,8 @@ import (
 )
 
 type Options struct {
-	Port int `default:"8888" help:"Port to listen on" short:"p"`
+	Port       int `default:"8888" help:"Port to listen on"               short:"p"`
+	CodeLength int `default:"8"    help:"Length of generated short codes" short:"c"`
 }
 
 func New(_ humacli.Hooks, options *Options) *do.Injector {
@@ -25,7 +26,7 @@ func New(_ humacli.Hooks, options *Options) *do.Injector {
 
 	urlStore := store.NewMemoryStore()
 	baseURL := fmt.Sprintf("http://localhost:%d", options.Port)
-	urlHandler := handlers.NewURLHandler(urlStore, baseURL)
+	urlHandler := handlers.NewURLHandler(urlStore, baseURL, options.CodeLength)
 
 	do.ProvideValue(injector, router)
 	do.ProvideValue(injector, api)
