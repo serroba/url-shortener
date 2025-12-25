@@ -40,6 +40,7 @@ func (h *URLHandler) CreateShortURL(ctx context.Context, req *CreateShortURLRequ
 	}
 
 	var code string
+
 	var err error
 
 	switch strategy {
@@ -72,6 +73,7 @@ func (h *URLHandler) createWithTokenStrategy(ctx context.Context, url string) (s
 	if err := h.store.Save(ctx, code, url); err != nil {
 		return "", err
 	}
+
 	return code, nil
 }
 
@@ -92,6 +94,7 @@ func (h *URLHandler) createWithHashStrategy(ctx context.Context, rawURL string) 
 		// Found existing code - return it (deduplication)
 		return existingCode, nil
 	}
+
 	if !errors.Is(err, ErrNotFound) {
 		// Unexpected error
 		return "", err

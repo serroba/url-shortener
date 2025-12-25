@@ -40,6 +40,109 @@ func TestCreateShortURL(t *testing.T) {
 		assert.Nil(t, resp)
 		assert.Error(t, err)
 	})
+
+	t.Run("returns error for invalid strategy", func(t *testing.T) {
+		memStore := store.NewMemoryStore()
+		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
+
+		req := &handlers.CreateShortURLRequest{}
+		req.Body.URL = "https://example.com"
+		req.Body.Strategy = "invalid"
+
+		resp, err := handler.CreateShortURL(context.Background(), req)
+
+		assert.Nil(t, resp)
+		assert.Error(t, err)
+	})
+
+	t.Run("token strategy creates new code for same URL", func(t *testing.T) {
+		memStore := store.NewMemoryStore()
+		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
+
+		req := &handlers.CreateShortURLRequest{}
+		req.Body.URL = "https://example.com"
+		req.Body.Strategy = handlers.StrategyToken
+
+		resp1, err1 := handler.CreateShortURL(context.Background(), req)
+		resp2, err2 := handler.CreateShortURL(context.Background(), req)
+
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.NotEqual(t, resp1.Body.Code, resp2.Body.Code)
+	})
+
+	t.Run("hash strategy returns same code for same URL", func(t *testing.T) {
+		memStore := store.NewMemoryStore()
+		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
+
+		req := &handlers.CreateShortURLRequest{}
+		req.Body.URL = "https://example.com"
+		req.Body.Strategy = handlers.StrategyHash
+
+		resp1, err1 := handler.CreateShortURL(context.Background(), req)
+		resp2, err2 := handler.CreateShortURL(context.Background(), req)
+
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.Equal(t, resp1.Body.Code, resp2.Body.Code)
+	})
+
+	t.Run("hash strategy returns same code for equivalent URLs", func(t *testing.T) {
+		memStore := store.NewMemoryStore()
+		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
+
+		req1 := &handlers.CreateShortURLRequest{}
+		req1.Body.URL = "https://example.com/path"
+		req1.Body.Strategy = handlers.StrategyHash
+
+		req2 := &handlers.CreateShortURLRequest{}
+		req2.Body.URL = "HTTPS://EXAMPLE.COM/path/"
+		req2.Body.Strategy = handlers.StrategyHash
+
+		resp1, err1 := handler.CreateShortURL(context.Background(), req1)
+		resp2, err2 := handler.CreateShortURL(context.Background(), req2)
+
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.Equal(t, resp1.Body.Code, resp2.Body.Code)
+	})
+
+	t.Run("hash strategy returns different codes for different URLs", func(t *testing.T) {
+		memStore := store.NewMemoryStore()
+		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
+
+		req1 := &handlers.CreateShortURLRequest{}
+		req1.Body.URL = "https://example.com/path1"
+		req1.Body.Strategy = handlers.StrategyHash
+
+		req2 := &handlers.CreateShortURLRequest{}
+		req2.Body.URL = "https://example.com/path2"
+		req2.Body.Strategy = handlers.StrategyHash
+
+		resp1, err1 := handler.CreateShortURL(context.Background(), req1)
+		resp2, err2 := handler.CreateShortURL(context.Background(), req2)
+
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.NotEqual(t, resp1.Body.Code, resp2.Body.Code)
+	})
+
+	t.Run("defaults to token strategy when not specified", func(t *testing.T) {
+		memStore := store.NewMemoryStore()
+		handler := handlers.NewURLHandler(memStore, "http://localhost:8888", 8)
+
+		req := &handlers.CreateShortURLRequest{}
+		req.Body.URL = "https://example.com"
+		// Strategy not set - should default to token
+
+		resp1, err1 := handler.CreateShortURL(context.Background(), req)
+		resp2, err2 := handler.CreateShortURL(context.Background(), req)
+
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		// Token strategy: different codes for same URL
+		assert.NotEqual(t, resp1.Body.Code, resp2.Body.Code)
+	})
 }
 
 func TestRedirectToURL(t *testing.T) {

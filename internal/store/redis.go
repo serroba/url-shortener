@@ -47,6 +47,7 @@ func (r *RedisStore) SaveWithHash(ctx context.Context, code, url, urlHash string
 	pipe.Set(ctx, r.prefix+code, url, 0)
 	pipe.HSet(ctx, r.hashKey, urlHash, code)
 	_, err := pipe.Exec(ctx)
+
 	return err
 }
 

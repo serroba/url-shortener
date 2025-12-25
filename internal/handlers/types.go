@@ -13,8 +13,8 @@ const (
 // CreateShortURLRequest is the request body for creating a short URL.
 type CreateShortURLRequest struct {
 	Body struct {
-		URL      string   `doc:"The URL to shorten" example:"https://example.com/very/long/path" json:"url"`
-		Strategy Strategy `doc:"Shortening strategy (token or hash)" enum:"token,hash" default:"token" json:"strategy,omitempty"`
+		URL      string   `doc:"The URL to shorten" example:"https://example.com/path" json:"url"`
+		Strategy Strategy `default:"token"          doc:"Strategy"                     enum:"token,hash" json:"strategy"`
 	}
 }
 

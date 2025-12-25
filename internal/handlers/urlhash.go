@@ -8,10 +8,10 @@ import (
 )
 
 // NormalizeURL normalizes a URL for consistent hashing.
-// - Lowercases the scheme and host
-// - Removes default ports (80 for http, 443 for https)
-// - Removes trailing slashes from path (unless path is just "/")
-// - Removes empty fragment
+// - Lowercases the scheme and host.
+// - Removes default ports (80 for http, 443 for https).
+// - Removes trailing slashes from path (unless path is just "/").
+// - Removes empty fragment.
 func NormalizeURL(rawURL string) (string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -45,5 +45,6 @@ func NormalizeURL(rawURL string) (string, error) {
 // Returns the hash as a hex-encoded string.
 func HashURL(normalizedURL string) string {
 	h := sha256.Sum256([]byte(normalizedURL))
+
 	return hex.EncodeToString(h[:])
 }
