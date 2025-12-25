@@ -1,6 +1,7 @@
 # URL Shortener
 
 [![CI/CD Pipeline](https://github.com/serroba/web-demo-go/actions/workflows/cy.yml/badge.svg)](https://github.com/serroba/web-demo-go/actions/workflows/cy.yml)
+[![codecov](https://codecov.io/gh/serroba/web-demo-go/branch/main/graph/badge.svg)](https://codecov.io/gh/serroba/web-demo-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/serroba/web-demo-go)](https://goreportcard.com/report/github.com/serroba/web-demo-go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/serroba/web-demo-go.svg)](https://pkg.go.dev/github.com/serroba/web-demo-go)
 
