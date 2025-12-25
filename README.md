@@ -1,5 +1,9 @@
 # URL Shortener
 
+[![CI/CD Pipeline](https://github.com/serroba/web-demo-go/actions/workflows/cy.yml/badge.svg)](https://github.com/serroba/web-demo-go/actions/workflows/cy.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/serroba/web-demo-go)](https://goreportcard.com/report/github.com/serroba/web-demo-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/serroba/web-demo-go.svg)](https://pkg.go.dev/github.com/serroba/web-demo-go)
+
 A URL shortening service with two strategies for generating short codes.
 
 ## API
