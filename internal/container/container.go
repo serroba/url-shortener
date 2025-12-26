@@ -19,6 +19,7 @@ import (
 	ratelimitstore "github.com/serroba/web-demo-go/internal/ratelimit/store"
 	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
+	"go.uber.org/zap"
 )
 
 type Options struct {
@@ -29,6 +30,20 @@ type Options struct {
 	RateLimitWindow time.Duration `default:"1m"             env:"RATE_LIMIT_WINDOW"     help:"Rate limit window"`
 	RateLimitStore  string        `default:"memory"         env:"RATE_LIMIT_STORE"      help:"memory or redis"`
 	CacheSize       int           `default:"1000"           env:"CACHE_SIZE"            help:"LRU cache size (0=off)"`
+	LogFormat       string        `default:"console"        env:"LOG_FORMAT"            help:"Log format: console or json"`
+}
+
+// LoggerPackage provides the zap logger.
+func LoggerPackage(i *do.Injector) {
+	do.Provide(i, func(i *do.Injector) (*zap.Logger, error) {
+		opts := do.MustInvoke[*Options](i)
+
+		if opts.LogFormat == "json" {
+			return zap.NewProduction()
+		}
+
+		return zap.NewDevelopment()
+	})
 }
 
 // RedisPackage provides the Redis client.
