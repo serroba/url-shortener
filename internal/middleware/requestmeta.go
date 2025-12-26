@@ -7,13 +7,14 @@ import (
 	"github.com/serroba/web-demo-go/internal/handlers"
 )
 
-// RequestMeta is a middleware that adds client IP and user-agent to the request context.
+// RequestMeta is a middleware that adds client IP, user-agent, and referrer to the request context.
 func RequestMeta(_ huma.API) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		clientIP := extractClientIP(ctx)
 		userAgent := ctx.Header("User-Agent")
+		referrer := ctx.Header("Referer")
 
-		newCtx := handlers.ContextWithRequestMeta(ctx.Context(), clientIP, userAgent)
+		newCtx := handlers.ContextWithRequestMeta(ctx.Context(), clientIP, userAgent, referrer)
 		ctx = huma.WithContext(ctx, newCtx)
 
 		next(ctx)

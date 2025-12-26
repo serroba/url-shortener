@@ -12,3 +12,12 @@ type URLCreatedEvent struct {
 	ClientIP    string    `json:"clientIp"`
 	UserAgent   string    `json:"userAgent"`
 }
+
+// URLAccessedEvent represents an event emitted when a short URL is accessed.
+type URLAccessedEvent struct {
+	Code       string    `json:"code"`
+	AccessedAt time.Time `json:"accessedAt"`
+	ClientIP   string    `json:"clientIp"`
+	UserAgent  string    `json:"userAgent"`
+	Referrer   string    `json:"referrer,omitempty"`
+}

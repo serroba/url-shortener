@@ -7,7 +7,10 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message"
 )
 
-const TopicURLCreated = "url.created"
+const (
+	TopicURLCreated  = "url.created"
+	TopicURLAccessed = "url.accessed"
+)
 
 // Publisher publishes analytics events.
 type Publisher struct {
@@ -29,6 +32,18 @@ func (p *Publisher) PublishURLCreated(event *URLCreatedEvent) error {
 	msg := message.NewMessage(watermill.NewUUID(), payload)
 
 	return p.publisher.Publish(TopicURLCreated, msg)
+}
+
+// PublishURLAccessed publishes a URL accessed event.
+func (p *Publisher) PublishURLAccessed(event *URLAccessedEvent) error {
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	msg := message.NewMessage(watermill.NewUUID(), payload)
+
+	return p.publisher.Publish(TopicURLAccessed, msg)
 }
 
 // Shutdown closes the underlying publisher.

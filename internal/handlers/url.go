@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/serroba/web-demo-go/internal/analytics"
@@ -45,12 +46,14 @@ type contextKey string
 const (
 	clientIPKey  contextKey = "clientIP"
 	userAgentKey contextKey = "userAgent"
+	referrerKey  contextKey = "referrer"
 )
 
-// ContextWithRequestMeta adds client IP and user-agent to context.
-func ContextWithRequestMeta(ctx context.Context, clientIP, userAgent string) context.Context {
+// ContextWithRequestMeta adds client IP, user-agent, and referrer to context.
+func ContextWithRequestMeta(ctx context.Context, clientIP, userAgent, referrer string) context.Context {
 	ctx = context.WithValue(ctx, clientIPKey, clientIP)
 	ctx = context.WithValue(ctx, userAgentKey, userAgent)
+	ctx = context.WithValue(ctx, referrerKey, referrer)
 
 	return ctx
 }
@@ -65,6 +68,14 @@ func clientIPFromContext(ctx context.Context) string {
 
 func userAgentFromContext(ctx context.Context) string {
 	if v, ok := ctx.Value(userAgentKey).(string); ok {
+		return v
+	}
+
+	return ""
+}
+
+func referrerFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(referrerKey).(string); ok {
 		return v
 	}
 
@@ -124,6 +135,21 @@ func (h *URLHandler) RedirectToURL(ctx context.Context, req *RedirectRequest) (*
 		}
 
 		return nil, huma.Error500InternalServerError("failed to get url")
+	}
+
+	event := &analytics.URLAccessedEvent{
+		Code:       req.Code,
+		AccessedAt: time.Now(),
+		ClientIP:   clientIPFromContext(ctx),
+		UserAgent:  userAgentFromContext(ctx),
+		Referrer:   referrerFromContext(ctx),
+	}
+
+	if err = h.publisher.PublishURLAccessed(event); err != nil {
+		h.logger.Error("failed to publish access event",
+			zap.String("code", event.Code),
+			zap.Error(err),
+		)
 	}
 
 	resp := &RedirectResponse{
