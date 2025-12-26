@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -21,20 +23,33 @@ func main() {
 		container.RateLimitPackage(injector)
 		container.HTTPPackage(injector)
 
+		var server *http.Server
+
 		hooks.OnStart(func() {
 			router := do.MustInvoke[*chi.Mux](injector)
 
 			// Invoke API to trigger route registration
 			_ = do.MustInvoke[huma.API](injector)
 
-			server := &http.Server{
+			server = &http.Server{
 				Addr:              fmt.Sprintf(":%d", options.Port),
 				Handler:           router,
 				ReadHeaderTimeout: 10 * time.Second,
 			}
-			if err := server.ListenAndServe(); err != nil {
+			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				panic(err)
 			}
+		})
+
+		hooks.OnStop(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if server != nil {
+				_ = server.Shutdown(ctx)
+			}
+
+			_ = injector.Shutdown()
 		})
 	})
 
