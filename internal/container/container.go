@@ -16,6 +16,7 @@ import (
 	"github.com/serroba/web-demo-go/internal/health"
 	"github.com/serroba/web-demo-go/internal/middleware"
 	"github.com/serroba/web-demo-go/internal/ratelimit"
+	ratelimitstore "github.com/serroba/web-demo-go/internal/ratelimit/store"
 	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
 )
@@ -65,9 +66,9 @@ func RateLimitPackage(i *do.Injector) {
 
 		switch opts.RateLimitStore {
 		case "redis":
-			return store.NewRateLimitRedisStore(redisClient), nil
+			return ratelimitstore.NewRedis(redisClient), nil
 		default:
-			return store.NewRateLimitMemoryStore(), nil
+			return ratelimitstore.NewMemory(), nil
 		}
 	})
 }

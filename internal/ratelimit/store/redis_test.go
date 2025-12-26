@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/serroba/web-demo-go/internal/store"
+	"github.com/serroba/web-demo-go/internal/ratelimit/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,11 +35,11 @@ func getRedisClient(t *testing.T) *redis.Client {
 	return client
 }
 
-func TestRateLimitRedisStore(t *testing.T) {
+func TestRedis(t *testing.T) {
 	client := getRedisClient(t)
 
 	t.Run("records and counts requests", func(t *testing.T) {
-		s := store.NewRateLimitRedisStore(client)
+		s := store.NewRedis(client)
 		key := "test:ratelimit:records:" + t.Name()
 
 		// Clean up before test
@@ -59,7 +59,7 @@ func TestRateLimitRedisStore(t *testing.T) {
 	})
 
 	t.Run("tracks keys independently", func(t *testing.T) {
-		s := store.NewRateLimitRedisStore(client)
+		s := store.NewRedis(client)
 		key1 := "test:ratelimit:independent:key1:" + t.Name()
 		key2 := "test:ratelimit:independent:key2:" + t.Name()
 
@@ -75,7 +75,7 @@ func TestRateLimitRedisStore(t *testing.T) {
 	})
 
 	t.Run("prunes expired entries", func(t *testing.T) {
-		s := store.NewRateLimitRedisStore(client)
+		s := store.NewRedis(client)
 		key := "test:ratelimit:prune:" + t.Name()
 
 		// Clean up before test

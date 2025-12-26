@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/serroba/web-demo-go/internal/ratelimit"
-	"github.com/serroba/web-demo-go/internal/store"
+	"github.com/serroba/web-demo-go/internal/ratelimit/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSlidingWindowLimiter(t *testing.T) {
 	t.Run("allows requests under limit", func(t *testing.T) {
-		memStore := store.NewRateLimitMemoryStore()
+		memStore := store.NewMemory()
 		limiter := ratelimit.NewSlidingWindowLimiter(memStore, 5, time.Minute)
 
 		for range 5 {
@@ -26,7 +26,7 @@ func TestSlidingWindowLimiter(t *testing.T) {
 	})
 
 	t.Run("denies requests over limit", func(t *testing.T) {
-		memStore := store.NewRateLimitMemoryStore()
+		memStore := store.NewMemory()
 		limiter := ratelimit.NewSlidingWindowLimiter(memStore, 3, time.Minute)
 
 		// First 3 should be allowed
@@ -45,7 +45,7 @@ func TestSlidingWindowLimiter(t *testing.T) {
 	})
 
 	t.Run("tracks clients independently", func(t *testing.T) {
-		memStore := store.NewRateLimitMemoryStore()
+		memStore := store.NewMemory()
 		limiter := ratelimit.NewSlidingWindowLimiter(memStore, 2, time.Minute)
 
 		// Client 1 uses their limit
@@ -65,7 +65,7 @@ func TestSlidingWindowLimiter(t *testing.T) {
 	})
 
 	t.Run("allows requests after window expires", func(t *testing.T) {
-		memStore := store.NewRateLimitMemoryStore()
+		memStore := store.NewMemory()
 		limiter := ratelimit.NewSlidingWindowLimiter(memStore, 2, 50*time.Millisecond)
 
 		// Use up the limit

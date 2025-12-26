@@ -6,20 +6,20 @@ import (
 	"time"
 )
 
-// RateLimitMemoryStore is an in-memory implementation of ratelimit.Store.
-type RateLimitMemoryStore struct {
+// Memory is an in-memory implementation of ratelimit.Store.
+type Memory struct {
 	mu       sync.Mutex
 	requests map[string][]time.Time
 }
 
-// NewRateLimitMemoryStore creates a new in-memory rate limit store.
-func NewRateLimitMemoryStore() *RateLimitMemoryStore {
-	return &RateLimitMemoryStore{
+// NewMemory creates a new in-memory rate limit store.
+func NewMemory() *Memory {
+	return &Memory{
 		requests: make(map[string][]time.Time),
 	}
 }
 
-func (s *RateLimitMemoryStore) Record(_ context.Context, key string, window time.Duration) (int64, error) {
+func (s *Memory) Record(_ context.Context, key string, window time.Duration) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

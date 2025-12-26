@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/serroba/web-demo-go/internal/store"
+	"github.com/serroba/web-demo-go/internal/ratelimit/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRateLimitMemoryStore(t *testing.T) {
+func TestMemory(t *testing.T) {
 	t.Run("records and counts requests", func(t *testing.T) {
-		s := store.NewRateLimitMemoryStore()
+		s := store.NewMemory()
 
 		count1, err := s.Record(context.Background(), "key1", time.Minute)
 
@@ -31,7 +31,7 @@ func TestRateLimitMemoryStore(t *testing.T) {
 	})
 
 	t.Run("tracks keys independently", func(t *testing.T) {
-		s := store.NewRateLimitMemoryStore()
+		s := store.NewMemory()
 
 		_, _ = s.Record(context.Background(), "key1", time.Minute)
 		_, _ = s.Record(context.Background(), "key1", time.Minute)
@@ -43,7 +43,7 @@ func TestRateLimitMemoryStore(t *testing.T) {
 	})
 
 	t.Run("prunes expired entries", func(t *testing.T) {
-		s := store.NewRateLimitMemoryStore()
+		s := store.NewMemory()
 
 		// Record some requests
 		_, _ = s.Record(context.Background(), "key1", 50*time.Millisecond)
