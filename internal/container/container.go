@@ -156,12 +156,22 @@ func PublisherGroupPackage(i *do.Injector) {
 	})
 }
 
+// AnalyticsStorePackage provides the analytics store for persisting events.
+func AnalyticsStorePackage(i *do.Injector) {
+	do.Provide(i, func(i *do.Injector) (analytics.Store, error) {
+		pool := do.MustInvoke[*PostgresPool](i)
+
+		return analyticsstore.NewPostgres(pool.Pool), nil
+	})
+}
+
 // ConsumerGroupPackage provides the consumer group with all registered consumers.
 func ConsumerGroupPackage(i *do.Injector) {
 	do.Provide(i, func(i *do.Injector) (*messaging.ConsumerGroup, error) {
 		opts := do.MustInvoke[*Options](i)
 		redisClient := do.MustInvoke[*redis.Client](i)
 		logger := do.MustInvoke[*zap.Logger](i)
+		store := do.MustInvoke[analytics.Store](i)
 
 		subscriber, err := redisstream.NewSubscriber(
 			redisstream.SubscriberConfig{
@@ -174,21 +184,20 @@ func ConsumerGroupPackage(i *do.Injector) {
 			return nil, err
 		}
 
-		analyticsStore := analyticsstore.NewNoop(logger)
 		group := messaging.NewConsumerGroup(subscriber, logger)
 
 		// Register analytics consumers
 		group.Add(messaging.NewConsumer(
 			subscriber,
 			opts.TopicURLCreated,
-			analyticsStore.SaveURLCreated,
+			store.SaveURLCreated,
 			logger,
 		))
 
 		group.Add(messaging.NewConsumer(
 			subscriber,
 			opts.TopicURLAccessed,
-			analyticsStore.SaveURLAccessed,
+			store.SaveURLAccessed,
 			logger,
 		))
 
