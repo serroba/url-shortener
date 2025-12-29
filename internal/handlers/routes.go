@@ -20,7 +20,6 @@ func RegisterRoutes(api huma.API, urlHandler *URLHandler) {
 		Tags:        []string{"URLs"},
 		Metadata: map[string]any{
 			ratelimit.MetadataKey: ratelimit.EndpointConfig{
-				Scope: ratelimit.ScopeWrite,
 				Limits: []ratelimit.LimitConfig{
 					{Window: time.Minute, Max: 10},     // 10 per minute
 					{Window: time.Hour, Max: 100},      // 100 per hour
@@ -40,7 +39,6 @@ func RegisterRoutes(api huma.API, urlHandler *URLHandler) {
 		Tags:        []string{"URLs"},
 		Metadata: map[string]any{
 			ratelimit.MetadataKey: ratelimit.EndpointConfig{
-				Scope: ratelimit.ScopeRead,
 				Limits: []ratelimit.LimitConfig{
 					{Window: time.Minute, Max: 1000}, // 1000 per minute
 				},

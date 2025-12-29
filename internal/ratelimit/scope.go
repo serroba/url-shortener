@@ -21,12 +21,25 @@ const MetadataKey = "rateLimit"
 // EndpointConfig defines per-endpoint rate limit configuration.
 // This can be attached to Huma operations via the Metadata field.
 type EndpointConfig struct {
-	// Scope overrides the default scope detection (read/write based on method).
-	// If empty, the default method-based detection is used.
+	// Scope overrides the default scope detection (read/write based on method)
+	// when no custom Limits are configured for the endpoint.
+	//
+	// If Scope is empty and Limits is nil or empty, the middleware falls back
+	// to method-based scope detection (read/write based on HTTP method).
+	//
+	// NOTE: When custom Limits are provided, the middleware applies those
+	// limits directly and does not use scope-based default limits, so Scope
+	// has no effect in that case.
 	Scope Scope
 
 	// Limits defines custom rate limits for this endpoint.
-	// If nil, the default policy limits for the scope are used.
+	//
+	// If Limits is nil or empty, the default policy limits for the resolved
+	// scopes are used (based on Scope, or method-based detection when Scope
+	// is empty).
+	//
+	// When Limits is non-empty, the middleware bypasses scope-based default
+	// limits and uses only the provided Limits; Scope is ignored.
 	Limits []LimitConfig
 
 	// Disabled skips rate limiting entirely for this endpoint.
