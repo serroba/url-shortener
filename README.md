@@ -36,6 +36,7 @@ A production-ready URL shortening microservice built with Go, featuring distribu
 
 - Go 1.25+
 - Docker and Docker Compose
+- [hey](https://github.com/rakyll/hey) (for performance testing)
 
 ### Run Locally
 
@@ -43,11 +44,31 @@ A production-ready URL shortening microservice built with Go, featuring distribu
 # Start dependencies (Redis, TimescaleDB) and run migrations
 docker-compose up -d
 
-# Start the server
+# Start the API server
 go run ./cmd/server --database-url="postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable"
+
+# (Optional) Start the analytics consumer in a separate terminal
+go run ./cmd/consumer --database-url="postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable"
 ```
 
 The API will be available at `http://localhost:8888`.
+
+### Running with Custom Options
+
+```bash
+# Use Redis for distributed rate limiting
+go run ./cmd/server \
+  --database-url="postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable" \
+  --rate-limit-store=redis \
+  --redis-addr=localhost:6379
+
+# Change port and cache settings
+go run ./cmd/server \
+  --database-url="postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable" \
+  --port=3000 \
+  --cache-size=5000 \
+  --cache-ttl=30m
+```
 
 ## API Reference
 
@@ -147,6 +168,63 @@ golangci-lint run
 
 # Generate mocks
 go generate ./...
+```
+
+### Performance Testing
+
+The project includes scripts for load testing and performance regression detection.
+
+#### Quick Stress Test
+
+```bash
+# Run comprehensive stress test (requires hey)
+./scripts/stress-test.sh
+```
+
+This runs various load scenarios including burst traffic, sustained load, and mixed read/write workloads.
+
+#### CI Performance Tests
+
+```bash
+# Run the CI performance test suite
+./scripts/perf-test.sh
+
+# Compare against baseline (used in CI)
+./scripts/perf-compare.sh
+```
+
+The `perf-test.sh` script:
+- Runs 1000 requests at 50 concurrency for redirect (read) and shorten (write) endpoints
+- Outputs metrics to `perf-results.json`
+- Gates on p95 latency < 50ms threshold
+
+The `perf-compare.sh` script:
+- Compares current results against a cached baseline
+- Generates `perf-report.md` with comparison table
+- Flags regressions > 50% from baseline
+
+#### End-to-End Tests
+
+```bash
+# Run E2E tests validating the full async flow
+./scripts/e2e-test.sh
+```
+
+This validates the complete flow: API → Redis Streams → Consumer → TimescaleDB.
+
+#### Manual Load Testing
+
+```bash
+# Install hey if not already installed
+go install github.com/rakyll/hey@latest
+
+# Test redirect endpoint (read)
+hey -n 1000 -c 50 http://localhost:8888/{short-code}
+
+# Test shorten endpoint (write)
+hey -n 100 -c 10 -m POST -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","strategy":"token"}' \
+  http://localhost:8888/shorten
 ```
 
 ## License
