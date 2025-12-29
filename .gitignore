@@ -25,3 +25,4 @@ go.work.sum
 .env
 /cmd/broker/broker
 /broker
+/server

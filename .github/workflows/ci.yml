@@ -214,10 +214,8 @@ jobs:
         run: go build -o app ./cmd/server
 
       - name: Start application
-        env:
-          DATABASE_URL: postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable
         run: |
-          ./app &
+          DATABASE_URL="postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable" ./app &
           echo $! > app.pid
 
       - name: Wait for application to be ready
