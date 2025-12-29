@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -69,4 +70,39 @@ func clientIP(ctx huma.Context) string {
 	}
 
 	return ip
+}
+
+// PolicyRateLimiter returns a Huma middleware that applies policy-based rate limiting.
+// It uses a ScopeResolver to determine which scopes apply to each request,
+// then checks all applicable limits from the policy.
+func PolicyRateLimiter(
+	api huma.API,
+	limiter *ratelimit.PolicyLimiter,
+	resolver ratelimit.ScopeResolver,
+) func(ctx huma.Context, next func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		key := clientKey(ctx)
+		scopes := resolver.Resolve(ctx)
+
+		allowed, exceeded, err := limiter.Allow(ctx.Context(), key, scopes)
+		if err != nil {
+			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "internal server error", err)
+
+			return
+		}
+
+		if !allowed {
+			msg := "rate limit exceeded"
+			if exceeded != nil {
+				msg = fmt.Sprintf("rate limit exceeded: %s scope, %d/%d requests in %s",
+					exceeded.Scope, exceeded.Count, exceeded.Config.Max, exceeded.Config.Window)
+			}
+
+			_ = huma.WriteErr(api, ctx, http.StatusTooManyRequests, msg)
+
+			return
+		}
+
+		next(ctx)
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/serroba/web-demo-go/internal/middleware"
+	"github.com/serroba/web-demo-go/internal/ratelimit"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -287,4 +288,206 @@ func TestClientIP_HostWithoutPort(t *testing.T) {
 	mw(ctx2, func(_ huma.Context) {})
 
 	assert.Equal(t, key1, capturedKey, "should use host as-is when SplitHostPort fails")
+}
+
+// mockPolicyStore is a mock store for testing PolicyRateLimiter.
+type mockPolicyStore struct {
+	counts map[string]int64
+	err    error
+}
+
+func newMockPolicyStore() *mockPolicyStore {
+	return &mockPolicyStore{counts: make(map[string]int64)}
+}
+
+func (m *mockPolicyStore) Record(_ context.Context, key string, _ time.Duration) (int64, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+
+	m.counts[key]++
+
+	return m.counts[key], nil
+}
+
+// mockScopeResolver is a mock resolver for testing.
+type mockScopeResolver struct {
+	scopes []ratelimit.Scope
+}
+
+func (m *mockScopeResolver) Resolve(_ huma.Context) []ratelimit.Scope {
+	return m.scopes
+}
+
+func TestPolicyRateLimiter(t *testing.T) {
+	t.Run("allows request when under limit", func(t *testing.T) {
+		api := newTestAPI()
+		store := newMockPolicyStore()
+		policy := ratelimit.NewPolicyBuilder().
+			AddLimit(ratelimit.ScopeGlobal, 10, time.Minute).
+			Build()
+		limiter := ratelimit.NewPolicyLimiter(store, policy)
+		resolver := &mockScopeResolver{scopes: []ratelimit.Scope{ratelimit.ScopeGlobal}}
+
+		mw := middleware.PolicyRateLimiter(api, limiter, resolver)
+
+		ctx := newMockHumaContext()
+		ctx.host = testHostAddr
+		ctx.headers["User-Agent"] = testUserAgent
+
+		nextCalled := false
+
+		mw(ctx, func(_ huma.Context) {
+			nextCalled = true
+		})
+
+		assert.True(t, nextCalled, "next should be called when allowed")
+	})
+
+	t.Run("returns 429 when rate limited", func(t *testing.T) {
+		api := newTestAPI()
+		store := newMockPolicyStore()
+		policy := ratelimit.NewPolicyBuilder().
+			AddLimit(ratelimit.ScopeGlobal, 1, time.Minute).
+			Build()
+		limiter := ratelimit.NewPolicyLimiter(store, policy)
+		resolver := &mockScopeResolver{scopes: []ratelimit.Scope{ratelimit.ScopeGlobal}}
+
+		mw := middleware.PolicyRateLimiter(api, limiter, resolver)
+
+		ctx := newMockHumaContext()
+		ctx.host = testHostAddr
+		ctx.headers["User-Agent"] = testUserAgent
+
+		// First request allowed
+		mw(ctx, func(_ huma.Context) {})
+
+		// Second request should be denied
+		ctx2 := newMockHumaContext()
+		ctx2.host = testHostAddr
+		ctx2.headers["User-Agent"] = testUserAgent
+
+		nextCalled := false
+
+		mw(ctx2, func(_ huma.Context) {
+			nextCalled = true
+		})
+
+		assert.False(t, nextCalled, "next should not be called when rate limited")
+		assert.Equal(t, 429, ctx2.statusCode)
+		assert.Contains(t, string(ctx2.written), "rate limit exceeded")
+	})
+
+	t.Run("includes limit details in error message", func(t *testing.T) {
+		api := newTestAPI()
+		store := newMockPolicyStore()
+		policy := ratelimit.NewPolicyBuilder().
+			AddLimit(ratelimit.ScopeWrite, 1, time.Minute).
+			Build()
+		limiter := ratelimit.NewPolicyLimiter(store, policy)
+		resolver := &mockScopeResolver{scopes: []ratelimit.Scope{ratelimit.ScopeWrite}}
+
+		mw := middleware.PolicyRateLimiter(api, limiter, resolver)
+
+		ctx := newMockHumaContext()
+		ctx.host = testHostAddr
+		ctx.headers["User-Agent"] = testUserAgent
+
+		mw(ctx, func(_ huma.Context) {})
+
+		ctx2 := newMockHumaContext()
+		ctx2.host = testHostAddr
+		ctx2.headers["User-Agent"] = testUserAgent
+
+		mw(ctx2, func(_ huma.Context) {})
+
+		assert.Contains(t, string(ctx2.written), "write")
+		assert.Contains(t, string(ctx2.written), "2/1")
+	})
+
+	t.Run("applies different limits per scope", func(t *testing.T) {
+		api := newTestAPI()
+		store := newMockPolicyStore()
+		policy := ratelimit.NewPolicyBuilder().
+			AddLimit(ratelimit.ScopeRead, 5, time.Minute).
+			AddLimit(ratelimit.ScopeWrite, 2, time.Minute).
+			Build()
+		limiter := ratelimit.NewPolicyLimiter(store, policy)
+
+		readResolver := &mockScopeResolver{scopes: []ratelimit.Scope{ratelimit.ScopeRead}}
+		writeResolver := &mockScopeResolver{scopes: []ratelimit.Scope{ratelimit.ScopeWrite}}
+
+		readMW := middleware.PolicyRateLimiter(api, limiter, readResolver)
+		writeMW := middleware.PolicyRateLimiter(api, limiter, writeResolver)
+
+		// Read requests - should allow 5
+		for i := range 5 {
+			ctx := newMockHumaContext()
+			ctx.host = testHostAddr
+			ctx.headers["User-Agent"] = testUserAgent
+
+			nextCalled := false
+
+			readMW(ctx, func(_ huma.Context) {
+				nextCalled = true
+			})
+
+			assert.True(t, nextCalled, "read request %d should be allowed", i+1)
+		}
+
+		// Write requests - should only allow 2
+		for i := range 2 {
+			ctx := newMockHumaContext()
+			ctx.host = testHostAddr
+			ctx.headers["User-Agent"] = testUserAgent
+
+			nextCalled := false
+
+			writeMW(ctx, func(_ huma.Context) {
+				nextCalled = true
+			})
+
+			assert.True(t, nextCalled, "write request %d should be allowed", i+1)
+		}
+
+		// 3rd write should be denied
+		ctx := newMockHumaContext()
+		ctx.host = testHostAddr
+		ctx.headers["User-Agent"] = testUserAgent
+
+		nextCalled := false
+
+		writeMW(ctx, func(_ huma.Context) {
+			nextCalled = true
+		})
+
+		assert.False(t, nextCalled, "3rd write request should be denied")
+		assert.Equal(t, 429, ctx.statusCode)
+	})
+
+	t.Run("returns 500 on store error", func(t *testing.T) {
+		api := newTestAPI()
+		store := newMockPolicyStore()
+		store.err = errors.New("store error")
+		policy := ratelimit.NewPolicyBuilder().
+			AddLimit(ratelimit.ScopeGlobal, 10, time.Minute).
+			Build()
+		limiter := ratelimit.NewPolicyLimiter(store, policy)
+		resolver := &mockScopeResolver{scopes: []ratelimit.Scope{ratelimit.ScopeGlobal}}
+
+		mw := middleware.PolicyRateLimiter(api, limiter, resolver)
+
+		ctx := newMockHumaContext()
+		ctx.host = testHostAddr
+		ctx.headers["User-Agent"] = testUserAgent
+
+		nextCalled := false
+
+		mw(ctx, func(_ huma.Context) {
+			nextCalled = true
+		})
+
+		assert.False(t, nextCalled)
+		assert.Equal(t, 500, ctx.statusCode)
+	})
 }

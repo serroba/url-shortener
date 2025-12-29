@@ -30,19 +30,24 @@ import (
 )
 
 type Options struct {
-	Port             int           `default:"8888"           help:"Port to listen on"  short:"p"`
-	CodeLength       int           `default:"8"              help:"Short code length"  short:"c"`
-	RedisAddr        string        `default:"localhost:6379" help:"Redis address"      short:"r"`
-	DatabaseURL      string        `env:"DATABASE_URL"       help:"PostgreSQL URL"     required:""`
-	RateLimitReqs    int64         `default:"100"            env:"RATE_LIMIT_REQUESTS" help:"Requests per window"`
-	RateLimitWindow  time.Duration `default:"1m"             env:"RATE_LIMIT_WINDOW"   help:"Rate limit window"`
-	RateLimitStore   string        `default:"memory"         env:"RATE_LIMIT_STORE"    help:"memory or redis"`
-	CacheSize        int           `default:"1000"           env:"CACHE_SIZE"          help:"LRU cache size (0=off)"`
-	CacheTTL         time.Duration `default:"1h"             env:"CACHE_TTL"           help:"Redis cache TTL"`
-	LogFormat        string        `default:"console"        env:"LOG_FORMAT"          help:"console or json"`
-	TopicURLCreated  string        `default:"url.created"    env:"TOPIC_URL_CREATED"   help:"URL created topic"`
-	TopicURLAccessed string        `default:"url.accessed"   env:"TOPIC_URL_ACCESSED"  help:"URL accessed topic"`
-	ConsumerGroup    string        `default:"analytics"      env:"CONSUMER_GROUP"      help:"Consumer group name"`
+	Port             int           `default:"8888"           help:"Port to listen on" short:"p"`
+	CodeLength       int           `default:"8"              help:"Short code length" short:"c"`
+	RedisAddr        string        `default:"localhost:6379" help:"Redis address"     short:"r"`
+	DatabaseURL      string        `env:"DATABASE_URL"       help:"PostgreSQL URL"    required:""`
+	RateLimitStore   string        `default:"memory"         env:"RATE_LIMIT_STORE"   help:"memory or redis"`
+	CacheSize        int           `default:"1000"           env:"CACHE_SIZE"         help:"LRU cache size (0=off)"`
+	CacheTTL         time.Duration `default:"1h"             env:"CACHE_TTL"          help:"Redis cache TTL"`
+	LogFormat        string        `default:"console"        env:"LOG_FORMAT"         help:"console or json"`
+	TopicURLCreated  string        `default:"url.created"    env:"TOPIC_URL_CREATED"  help:"URL created topic"`
+	TopicURLAccessed string        `default:"url.accessed"   env:"TOPIC_URL_ACCESSED" help:"URL accessed topic"`
+	ConsumerGroup    string        `default:"analytics"      env:"CONSUMER_GROUP"     help:"Consumer group name"`
+
+	// Rate limit configuration per scope
+	RateLimitGlobalPerDay   int64 `default:"5000" env:"RATE_LIMIT_GLOBAL_DAY"   help:"Global requests per day"`
+	RateLimitReadPerMinute  int64 `default:"100"  env:"RATE_LIMIT_READ_MINUTE"  help:"Read requests per minute"`
+	RateLimitWritePerMinute int64 `default:"10"   env:"RATE_LIMIT_WRITE_MINUTE" help:"Write requests per minute"`
+	RateLimitWritePerHour   int64 `default:"100"  env:"RATE_LIMIT_WRITE_HOUR"   help:"Write requests per hour"`
+	RateLimitWritePerDay    int64 `default:"500"  env:"RATE_LIMIT_WRITE_DAY"    help:"Write requests per day"`
 }
 
 // LoggerPackage provides the zap logger.
@@ -247,8 +252,18 @@ func HTTPPackage(i *do.Injector) {
 		// Set up middleware
 		api.UseMiddleware(middleware.RequestMeta(api))
 
-		limiter := ratelimit.NewSlidingWindowLimiter(rateLimitStore, opts.RateLimitReqs, opts.RateLimitWindow)
-		api.UseMiddleware(middleware.RateLimiter(api, limiter))
+		// Build rate limit policy from configuration
+		policy := ratelimit.NewPolicyBuilder().
+			AddLimit(ratelimit.ScopeGlobal, opts.RateLimitGlobalPerDay, 24*time.Hour).
+			AddLimit(ratelimit.ScopeRead, opts.RateLimitReadPerMinute, time.Minute).
+			AddLimit(ratelimit.ScopeWrite, opts.RateLimitWritePerMinute, time.Minute).
+			AddLimit(ratelimit.ScopeWrite, opts.RateLimitWritePerHour, time.Hour).
+			AddLimit(ratelimit.ScopeWrite, opts.RateLimitWritePerDay, 24*time.Hour).
+			Build()
+
+		limiter := ratelimit.NewPolicyLimiter(rateLimitStore, policy)
+		resolver := ratelimit.NewMethodScopeResolver()
+		api.UseMiddleware(middleware.PolicyRateLimiter(api, limiter, resolver))
 
 		// Set up handlers
 		baseURL := fmt.Sprintf("http://localhost:%d", opts.Port)
