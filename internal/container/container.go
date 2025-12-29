@@ -263,7 +263,7 @@ func HTTPPackage(i *do.Injector) {
 			Build()
 
 		limiter := ratelimit.NewPolicyLimiter(rateLimitStore, policy)
-		resolver := ratelimit.NewMethodScopeResolver()
+		resolver := ratelimit.NewOperationScopeResolver()
 		api.UseMiddleware(middleware.PolicyRateLimiter(api, limiter, resolver))
 
 		// Set up handlers

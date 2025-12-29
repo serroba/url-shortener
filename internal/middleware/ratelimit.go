@@ -75,12 +75,40 @@ func clientIP(ctx huma.Context) string {
 // PolicyRateLimiter returns a Huma middleware that applies policy-based rate limiting.
 // It uses a ScopeResolver to determine which scopes apply to each request,
 // then checks all applicable limits from the policy.
+//
+// Per-endpoint configuration can be provided via operation metadata using
+// ratelimit.MetadataKey. This allows endpoints to:
+//   - Disable rate limiting entirely (Disabled: true)
+//   - Override the scope detection (Scope: ratelimit.ScopeRead)
+//   - Define custom limits (Limits: []ratelimit.LimitConfig{...})
 func PolicyRateLimiter(
 	api huma.API,
 	limiter *ratelimit.PolicyLimiter,
 	resolver ratelimit.ScopeResolver,
 ) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
+		// Check for per-endpoint configuration
+		if cfg := ratelimit.GetEndpointConfig(ctx); cfg != nil {
+			// Skip rate limiting if disabled for this endpoint
+			if cfg.Disabled {
+				next(ctx)
+
+				return
+			}
+
+			// If custom limits are defined, use them directly
+			if len(cfg.Limits) > 0 {
+				if !checkCustomLimits(api, ctx, limiter.Store(), cfg.Limits) {
+					return
+				}
+
+				next(ctx)
+
+				return
+			}
+		}
+
+		// Default behavior: use policy-based rate limiting
 		key := clientKey(ctx)
 		scopes := resolver.Resolve(ctx)
 
@@ -105,4 +133,38 @@ func PolicyRateLimiter(
 
 		next(ctx)
 	}
+}
+
+// checkCustomLimits applies custom rate limits defined in endpoint config.
+// Returns true if request is allowed, false if rate limited.
+func checkCustomLimits(
+	api huma.API,
+	ctx huma.Context,
+	store ratelimit.Store,
+	limits []ratelimit.LimitConfig,
+) bool {
+	clientK := clientKey(ctx)
+	path := ctx.Operation().Path
+
+	for _, limit := range limits {
+		// Build key combining client, path, and window for unique tracking
+		key := fmt.Sprintf("%s:custom:%s:%d", clientK, path, limit.Window.Milliseconds())
+
+		count, err := store.Record(ctx.Context(), key, limit.Window)
+		if err != nil {
+			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "internal server error", err)
+
+			return false
+		}
+
+		if count > limit.Max {
+			msg := fmt.Sprintf("rate limit exceeded: %d/%d requests in %s",
+				count, limit.Max, limit.Window)
+			_ = huma.WriteErr(api, ctx, http.StatusTooManyRequests, msg)
+
+			return false
+		}
+	}
+
+	return true
 }
