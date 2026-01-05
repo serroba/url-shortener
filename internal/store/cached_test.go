@@ -5,12 +5,34 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/serroba/web-demo-go/internal/cache"
 	"github.com/serroba/web-demo-go/internal/shortener"
 	"github.com/serroba/web-demo-go/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mockCache implements store.Cache for testing.
+type mockCache struct {
+	data map[string]*shortener.ShortURL
+}
+
+func newMockCache() *mockCache {
+	return &mockCache{data: make(map[string]*shortener.ShortURL)}
+}
+
+func (m *mockCache) Get(key string) (*shortener.ShortURL, bool) {
+	v, ok := m.data[key]
+
+	return v, ok
+}
+
+func (m *mockCache) Set(key string, value *shortener.ShortURL) {
+	m.data[key] = value
+}
+
+func (m *mockCache) Len() int {
+	return len(m.data)
+}
 
 type mockStore struct {
 	saveFunc      func(ctx context.Context, shortURL *shortener.ShortURL) error
@@ -60,8 +82,8 @@ func TestCachedRepository_GetByCode(t *testing.T) {
 				return url, nil
 			},
 		}
-		lru := cache.New(10)
-		cached := store.NewCachedRepository(mock, lru)
+		cache := newMockCache()
+		cached := store.NewCachedRepository(mock, cache)
 
 		// First call - cache miss
 		result, err := cached.GetByCode(context.Background(), "abc123")
@@ -85,13 +107,13 @@ func TestCachedRepository_GetByCode(t *testing.T) {
 				return nil, storeErr
 			},
 		}
-		lru := cache.New(10)
-		cached := store.NewCachedRepository(mock, lru)
+		cache := newMockCache()
+		cached := store.NewCachedRepository(mock, cache)
 
 		_, err := cached.GetByCode(context.Background(), "abc123")
 
 		require.ErrorIs(t, err, storeErr)
-		assert.Equal(t, 0, lru.Len(), "error should not be cached")
+		assert.Equal(t, 0, cache.Len(), "error should not be cached")
 	})
 
 	t.Run("ErrNotFound is not cached", func(t *testing.T) {
@@ -103,8 +125,8 @@ func TestCachedRepository_GetByCode(t *testing.T) {
 				return nil, shortener.ErrNotFound
 			},
 		}
-		lru := cache.New(10)
-		cached := store.NewCachedRepository(mock, lru)
+		cache := newMockCache()
+		cached := store.NewCachedRepository(mock, cache)
 
 		// First call
 		_, err := cached.GetByCode(context.Background(), "missing")
@@ -125,13 +147,13 @@ func TestCachedRepository_Save(t *testing.T) {
 			OriginalURL: "https://example.com",
 		}
 		mock := &mockStore{}
-		lru := cache.New(10)
-		cached := store.NewCachedRepository(mock, lru)
+		cache := newMockCache()
+		cached := store.NewCachedRepository(mock, cache)
 
 		err := cached.Save(context.Background(), url)
 
 		require.NoError(t, err)
-		assert.Equal(t, 1, lru.Len(), "cache should have the saved item")
+		assert.Equal(t, 1, cache.Len(), "cache should have the saved item")
 
 		// GetByCode should return from cache without hitting store
 		mock.callCount = 0
@@ -149,8 +171,8 @@ func TestCachedRepository_Save(t *testing.T) {
 				return saveErr
 			},
 		}
-		lru := cache.New(10)
-		cached := store.NewCachedRepository(mock, lru)
+		cache := newMockCache()
+		cached := store.NewCachedRepository(mock, cache)
 
 		url := &shortener.ShortURL{
 			Code:        "abc123",
@@ -159,7 +181,7 @@ func TestCachedRepository_Save(t *testing.T) {
 		err := cached.Save(context.Background(), url)
 
 		require.ErrorIs(t, err, saveErr)
-		assert.Equal(t, 0, lru.Len(), "cache should not be updated on error")
+		assert.Equal(t, 0, cache.Len(), "cache should not be updated on error")
 	})
 }
 
@@ -175,8 +197,8 @@ func TestCachedRepository_GetByHash(t *testing.T) {
 				return url, nil
 			},
 		}
-		lru := cache.New(10)
-		cached := store.NewCachedRepository(mock, lru)
+		cache := newMockCache()
+		cached := store.NewCachedRepository(mock, cache)
 
 		// First call
 		result, err := cached.GetByHash(context.Background(), "hash123")

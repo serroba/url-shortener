@@ -3,18 +3,25 @@ package store
 import (
 	"context"
 
-	"github.com/serroba/web-demo-go/internal/cache"
 	"github.com/serroba/web-demo-go/internal/shortener"
 )
 
-// CachedRepository wraps a Repository with an LRU cache for GetByCode lookups.
+// Cache defines the interface for URL caching.
+// This allows swapping cache implementations (LRU, SLRU, Clock, FIFO).
+type Cache interface {
+	Get(key string) (*shortener.ShortURL, bool)
+	Set(key string, value *shortener.ShortURL)
+	Len() int
+}
+
+// CachedRepository wraps a Repository with a cache for GetByCode lookups.
 type CachedRepository struct {
 	store shortener.Repository
-	cache *cache.LRU
+	cache Cache
 }
 
 // NewCachedRepository creates a new cached repository decorator.
-func NewCachedRepository(store shortener.Repository, c *cache.LRU) *CachedRepository {
+func NewCachedRepository(store shortener.Repository, c Cache) *CachedRepository {
 	return &CachedRepository{
 		store: store,
 		cache: c,

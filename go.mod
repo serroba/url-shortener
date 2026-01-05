@@ -12,6 +12,7 @@ require (
 	github.com/jaevor/go-nanoid v1.4.0
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/samber/do v1.6.0
+	github.com/serroba/cache v0.1.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.1
 )
