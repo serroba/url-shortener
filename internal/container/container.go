@@ -15,9 +15,9 @@ import (
 	"github.com/jaevor/go-nanoid"
 	"github.com/redis/go-redis/v9"
 	"github.com/samber/do"
+	"github.com/serroba/cache/lru"
 	"github.com/serroba/web-demo-go/internal/analytics"
 	analyticsstore "github.com/serroba/web-demo-go/internal/analytics/store"
-	"github.com/serroba/web-demo-go/internal/cache"
 	"github.com/serroba/web-demo-go/internal/handlers"
 	"github.com/serroba/web-demo-go/internal/health"
 	"github.com/serroba/web-demo-go/internal/messaging"
@@ -142,7 +142,7 @@ func RepositoryPackage(i *do.Injector) {
 
 		// Optional in-memory LRU cache on top
 		if opts.CacheSize > 0 {
-			repo = store.NewCachedRepository(repo, cache.New(opts.CacheSize))
+			repo = store.NewCachedRepository(repo, lru.New[string, *shortener.ShortURL](uint64(opts.CacheSize)))
 		}
 
 		return repo, nil
