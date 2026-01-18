@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/ThreeDotsLabs/watermill-redisstream v1.4.5
-	github.com/danielgtaylor/huma/v2 v2.34.1
+	github.com/danielgtaylor/huma/v2 v2.35.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
@@ -37,6 +37,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
